@@ -192,7 +192,7 @@ namespace ozz {
 				bool createSwapChainImageViews();
 
 			public:
-				bool prepare();
+				bool initialize();
 			};
 
 		}

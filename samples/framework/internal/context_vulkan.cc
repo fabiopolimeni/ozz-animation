@@ -574,7 +574,7 @@ bool ozz::sample::internal::ContextVulkan::createSwapChainImageViews() {
 	return true;
 }
 
-bool ozz::sample::internal::ContextVulkan::prepare() {
+bool ozz::sample::internal::ContextVulkan::initialize() {
 
 	// This will guarantee that each following function will
 	// be called only if every previous one has succeeded.

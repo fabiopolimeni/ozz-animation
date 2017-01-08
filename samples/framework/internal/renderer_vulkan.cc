@@ -48,7 +48,7 @@ ozz::sample::internal::RendererVulkan::~RendererVulkan()
 bool ozz::sample::internal::RendererVulkan::Initialize()
 {
 	context_ = memory::default_allocator()->New<internal::ContextVulkan>();
-	return context_->prepare();
+	return context_->initialize();
 }
 
 void ozz::sample::internal::RendererVulkan::OnResize(int32_t _width, int32_t _height)
@@ -66,57 +66,57 @@ void ozz::sample::internal::RendererVulkan::DrawGrid(int _cell_count, float _cel
 
 bool ozz::sample::internal::RendererVulkan::DrawSkeleton(const animation::Skeleton & _skeleton, const ozz::math::Float4x4 & _transform, bool _draw_joints)
 {
-	return false;
+	return true;
 }
 
 bool ozz::sample::internal::RendererVulkan::DrawPosture(const animation::Skeleton & _skeleton, ozz::Range<const ozz::math::Float4x4> _matrices, const ozz::math::Float4x4 & _transform, bool _draw_joints)
 {
-	return false;
+	return true;
 }
 
 bool ozz::sample::internal::RendererVulkan::DrawBoxIm(const ozz::math::Box & _box, const ozz::math::Float4x4 & _transform, const Color _colors[2])
 {
-	return false;
+	return true;
 }
 
 bool ozz::sample::internal::RendererVulkan::DrawBoxShaded(const ozz::math::Box & _box, ozz::Range<const ozz::math::Float4x4> _transforms, Color _color)
 {
-	return false;
+	return true;
 }
 
 bool ozz::sample::internal::RendererVulkan::DrawSkinnedMesh(const Mesh & _mesh, const Range<math::Float4x4> _skinning_matrices, const ozz::math::Float4x4 & _transform, const Options & _options)
 {
-	return false;
+	return true;
 }
 
 bool ozz::sample::internal::RendererVulkan::DrawMesh(const Mesh & _mesh, const ozz::math::Float4x4 & _transform, const Options & _options)
 {
-	return false;
+	return true;
 }
 
 bool ozz::sample::internal::RendererVulkan::DrawVectors(ozz::Range<const float> _positions, size_t _positions_stride, ozz::Range<const float> _directions, size_t _directions_stride, int _num_vectors, float _vector_length, Renderer::Color _color, const ozz::math::Float4x4 & _transform)
 {
-	return false;
+	return true;
 }
 
 bool ozz::sample::internal::RendererVulkan::DrawBinormals(ozz::Range<const float> _positions, size_t _positions_stride, ozz::Range<const float> _normals, size_t _normals_stride, ozz::Range<const float> _tangents, size_t _tangents_stride, ozz::Range<const float> _handenesses, size_t _handenesses_stride, int _num_vectors, float _vector_length, Renderer::Color _color, const ozz::math::Float4x4 & _transform)
 {
-	return false;
+	return true;
 }
 
 bool ozz::sample::internal::RendererVulkan::InitOpenGLExtensions()
 {
-	return false;
+	return true;
 }
 
 bool ozz::sample::internal::RendererVulkan::InitPostureRendering()
 {
-	return false;
+	return true;
 }
 
 bool ozz::sample::internal::RendererVulkan::InitCheckeredTexture()
 {
-	return false;
+	return true;
 }
 
 void ozz::sample::internal::RendererVulkan::DrawPosture_Impl(const ozz::math::Float4x4 & _transform, const float * _uniforms, int _instance_count, bool _draw_joints)

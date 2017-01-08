@@ -100,7 +100,7 @@ GLFWwindow* g_glfwWindow = nullptr;
 
 void glfw_error_callback(int _error, const char* _description)
 {
-	ozz::log::Err() << "GLFW Error! code= " << _error << " msg: "
+	ozz::log::Err() << "GLFW Error! code: " << _error << " msg: "
 		<< _description << std::endl;
 }
 
@@ -290,11 +290,13 @@ int Application::Run(int _argc, const char** _argv, const char* _version,
 		log::Err() << "Couldn't initialize OpenGL renderer" << std::endl;
 	}
 	
+	if (success) {
+		glfwSwapInterval(1);  // Enables vertical sync by default.
+	}
 #endif
 
 	if (success) {
       // Setup the window and installs callbacks.
-      glfwSwapInterval(1);  // Enables vertical sync by default.
 	  glfwSetKeyCallback(g_glfwWindow, glfw_key_callback);
 	  glfwSetWindowSizeCallback(g_glfwWindow, &glfw_resize_callback);
 	  glfwSetFramebufferSizeCallback(g_glfwWindow, &glfw_fb_resize_callback);
@@ -490,8 +492,10 @@ bool Application::Display() {
     shooter_->Capture(GL_BACK);
   }
 
+#ifndef OZZ_FRAMEWORK_VULKAN_RENDERER
   // Swaps current window.
   glfwSwapBuffers(g_glfwWindow);
+#endif
 
   return success;
 }
@@ -574,46 +578,49 @@ bool Application::Gui() {
 	  glfwGetMouseButton(g_glfwWindow, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS;
 
   // Starts frame
-  im_gui_->BeginFrame(input, window_rect, renderer_);
-
-  // Help gui.
+  if (im_gui_)
   {
-    math::RectFloat rect(kGuiMargin, kGuiMargin,
-                         window_rect.width - kGuiMargin * 2.f,
-                         window_rect.height - kGuiMargin * 2.f);
-    ImGui::Form form(im_gui_, "Show help", rect, &show_help_, false);
-    if (show_help_) {
-      im_gui_->DoLabel(help_.c_str(), ImGui::kLeft, false);
-    }
-  }
+	  im_gui_->BeginFrame(input, window_rect, renderer_);
 
-  // Do framework gui.
-  if (!show_help_ && success &&
-      window_rect.width > (kGuiMargin + kFormWidth) * 2.f) {
-    static bool open = true;
-    math::RectFloat rect(kGuiMargin, kGuiMargin, kFormWidth,
-                         window_rect.height - kGuiMargin * 2.f - kHelpMargin);
-    ImGui::Form form(im_gui_, "Framework", rect, &open, true);
-    if (open) {
-      success = FrameworkGui();
-    }
-  }
+	  // Help gui.
+	  {
+		  math::RectFloat rect(kGuiMargin, kGuiMargin,
+			  window_rect.width - kGuiMargin * 2.f,
+			  window_rect.height - kGuiMargin * 2.f);
+		  ImGui::Form form(im_gui_, "Show help", rect, &show_help_, false);
+		  if (show_help_) {
+			  im_gui_->DoLabel(help_.c_str(), ImGui::kLeft, false);
+		  }
+	  }
 
-  // Do sample gui.
-  if (!show_help_ && success && window_rect.width > kGuiMargin + kFormWidth) {
-    static bool open = true;
-    math::RectFloat rect(window_rect.width - kFormWidth - kGuiMargin,
-                         kGuiMargin, kFormWidth,
-                         window_rect.height - kGuiMargin * 2 - kHelpMargin);
-    ImGui::Form form(im_gui_, "Sample", rect, &open, true);
-    if (open) {
-      // Forwards event to the inherited application.
-      success = OnGui(im_gui_);
-    }
-  }
+	  // Do framework gui.
+	  if (!show_help_ && success &&
+		  window_rect.width > (kGuiMargin + kFormWidth) * 2.f) {
+		  static bool open = true;
+		  math::RectFloat rect(kGuiMargin, kGuiMargin, kFormWidth,
+			  window_rect.height - kGuiMargin * 2.f - kHelpMargin);
+		  ImGui::Form form(im_gui_, "Framework", rect, &open, true);
+		  if (open) {
+			  success = FrameworkGui();
+		  }
+	  }
 
-  // Ends frame
-  im_gui_->EndFrame();
+	  // Do sample gui.
+	  if (!show_help_ && success && window_rect.width > kGuiMargin + kFormWidth) {
+		  static bool open = true;
+		  math::RectFloat rect(window_rect.width - kFormWidth - kGuiMargin,
+			  kGuiMargin, kFormWidth,
+			  window_rect.height - kGuiMargin * 2 - kHelpMargin);
+		  ImGui::Form form(im_gui_, "Sample", rect, &open, true);
+		  if (open) {
+			  // Forwards event to the inherited application.
+			  success = OnGui(im_gui_);
+		  }
+	  }
+
+	  // Ends frame
+	  im_gui_->EndFrame();
+  }
 
   return success;
 }
