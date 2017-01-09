@@ -187,6 +187,14 @@ namespace ozz {
 				deleter_ptr<VkDeviceMemory> depthImageMemory{ device, vkFreeMemory };
 				deleter_ptr<VkImageView> depthImageView{ device, vkDestroyImageView };
 
+				deleter_ptr<VkDescriptorPool> descriptorPool{ device, vkDestroyDescriptorPool };
+				VkDescriptorSet descriptorSet;
+
+				std::vector<VkCommandBuffer> commandBuffers;
+
+				deleter_ptr<VkSemaphore> imageAvailableSemaphore{ device, vkDestroySemaphore };
+				deleter_ptr<VkSemaphore> renderFinishedSemaphore{ device, vkDestroySemaphore };
+
 				bool createInstance();
 				bool setupDebugCallback();
 				bool createSurface();
@@ -197,10 +205,19 @@ namespace ozz {
 				bool createRenderPass();
 				bool createDescriptorSetLayout();
 				bool createGraphicsPipeline();
+				bool createCommandPool();
+				bool createDepthResources();
+				bool createFramebuffers();
+				bool createDescriptorPool();
+				bool createDescriptorSet();
+				bool createCommandBuffers();
+				bool createSemaphores();
 
 			public:
 				bool initialize();
+				void shutdown();
 				bool drawFrame();
+				bool recreateSwapChain();
 			};
 
 		}

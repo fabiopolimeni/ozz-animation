@@ -123,11 +123,20 @@ void glfw_fb_resize_callback(GLFWwindow* /*_window*/, int _width, int _height) {
 	auto* application_ = ozz::sample::Application::GetInstance();
 	application_->SetResolution({ _width, _height });
 
-	application_->GetRenderer()->OnResize(_width, _height);
+	if (_width && _height) {
+		if (auto* renderer_ = application_->GetRenderer()) {
+			renderer_->OnResize(_width, _height);
+		}
 
-	// Forwards screen size to camera and shooter.
-	application_->GetCamera()->Resize(_width, _height);
-	application_->GetShooter()->Resize(_width, _height);
+		// Forwards screen size to camera and shooter.
+		if (auto* camera_ = application_->GetCamera()) {
+			application_->GetCamera()->Resize(_width, _height);
+		}
+
+		if (auto* shooter_ = application_->GetShooter()) {
+			shooter_->Resize(_width, _height);
+		}
+	}
 }
 
 void glfw_close_callback(GLFWwindow* /*_window*/) {

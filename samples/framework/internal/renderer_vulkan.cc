@@ -42,6 +42,7 @@ ozz::sample::internal::RendererVulkan::RendererVulkan(Camera * _camera)
 
 ozz::sample::internal::RendererVulkan::~RendererVulkan()
 {
+	context_->shutdown();
 	memory::default_allocator()->Delete(context_);
 }
 
@@ -53,6 +54,7 @@ bool ozz::sample::internal::RendererVulkan::Initialize()
 
 void ozz::sample::internal::RendererVulkan::OnResize(int32_t _width, int32_t _height)
 {
+	context_->recreateSwapChain();
 }
 
 void ozz::sample::internal::RendererVulkan::DrawAxes(const ozz::math::Float4x4 & _transform)
