@@ -9,8 +9,8 @@ add_custom_command(
           "${CMAKE_CURRENT_BINARY_DIR}/media/animation.ozz"
   COMMAND ${CMAKE_COMMAND} -E make_directory media
   COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_CURRENT_LIST_DIR}/README.md" .
-  COMMAND ${CMAKE_COMMAND} -E copy "${ozz_media_directory}/bin/alain_skeleton.ozz" "./media/skeleton.ozz"
-  COMMAND ${CMAKE_COMMAND} -E copy "${ozz_media_directory}/bin/alain_walk.ozz" "./media/animation.ozz")
+  COMMAND ${CMAKE_COMMAND} -E copy "${ozz_media_directory}/bin/alain_skeleton.ozz" "${CMAKE_CURRENT_BINARY_DIR}/media/skeleton.ozz"
+  COMMAND ${CMAKE_COMMAND} -E copy "${ozz_media_directory}/bin/alain_walk.ozz" "${CMAKE_CURRENT_BINARY_DIR}/media/animation.ozz")
 
 add_executable(sample_attach
   sample_attach.cc
@@ -22,6 +22,9 @@ target_link_libraries(sample_attach
   sample_framework)
 
 if (WIN32 AND ozz_build_with_vulkan)
+  add_dependencies(sample_attach
+    vulkan_shaders)
+    
   target_link_libraries(sample_attach
     ${VULKAN_LIBRARY})
 endif()

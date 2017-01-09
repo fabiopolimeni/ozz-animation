@@ -448,8 +448,7 @@ bool Application::Display() {
   {  // Profiles rendering excluding GUI.
     Profiler profile(render_time_);
 
-#ifdef OZZ_FRAMEWORK_VULKAN_RENDERER
-#else
+#ifndef OZZ_FRAMEWORK_VULKAN_RENDERER
     GL(ClearDepth(1.f));
     GL(ClearColor(.4f, .42f, .38f, 0.f));
     GL(Clear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT));
@@ -492,7 +491,11 @@ bool Application::Display() {
     shooter_->Capture(GL_BACK);
   }
 
-#ifndef OZZ_FRAMEWORK_VULKAN_RENDERER
+#ifdef OZZ_FRAMEWORK_VULKAN_RENDERER
+  if (success) {
+	  success = static_cast<internal::RendererVulkan*>(renderer_)->RenderFrame();
+  }
+#else
   // Swaps current window.
   glfwSwapBuffers(g_glfwWindow);
 #endif

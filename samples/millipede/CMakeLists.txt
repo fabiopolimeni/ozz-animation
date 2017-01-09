@@ -12,6 +12,9 @@ target_link_libraries(sample_millipede
   sample_framework)
 
 if (WIN32 AND ozz_build_with_vulkan)
+  add_dependencies(sample_millipede
+    vulkan_shaders)
+    
   target_link_libraries(sample_millipede
     ${VULKAN_LIBRARY})
 endif()

@@ -32,6 +32,9 @@ target_link_libraries(sample_multithread
   sample_framework)
 
 if (WIN32 AND ozz_build_with_vulkan)
+  add_dependencies(sample_multithread
+    vulkan_shaders)
+    
   target_link_libraries(sample_multithread
     ${VULKAN_LIBRARY})
 endif()

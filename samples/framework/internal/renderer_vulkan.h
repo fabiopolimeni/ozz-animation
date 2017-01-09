@@ -112,14 +112,13 @@ namespace ozz {
 					int _num_vectors, float _vector_length, Renderer::Color _color,
 					const ozz::math::Float4x4& _transform) override;
 
+				// Enqueue the recorded render commands
+				bool RenderFrame();
+
 				// Get application camera that provides rendering matrices.
 				Camera* camera() const { return camera_; }
 
 			private:
-				
-				// Detects and initializes all OpenGL extension.
-				// Return true if all mandatory extensions were found.
-				bool InitOpenGLExtensions();
 
 				// Initializes posture rendering.
 				// Return true if initialization succeeded.

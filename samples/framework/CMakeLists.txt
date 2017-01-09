@@ -14,8 +14,8 @@ if(NOT EMSCRIPTEN)
       set(ozz_renderer_source 
         internal/renderer_vulkan.h
         internal/renderer_vulkan.cc
-	internal/context_vulkan.h
-	internal/context_vulkan.cc)
+		internal/context_vulkan.h
+		internal/context_vulkan.cc)
 
       set(ozz_libs_to_link
         glfw)

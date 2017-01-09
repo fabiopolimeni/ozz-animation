@@ -24,6 +24,9 @@ target_link_libraries(sample_partial_blend
   sample_framework)
 
 if (WIN32 AND ozz_build_with_vulkan)
+  add_dependencies(sample_partial_blend
+    vulkan_shaders)
+
   target_link_libraries(sample_partial_blend
     ${VULKAN_LIBRARY})
 endif()

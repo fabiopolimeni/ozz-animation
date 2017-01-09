@@ -53,7 +53,6 @@ bool ozz::sample::internal::RendererVulkan::Initialize()
 
 void ozz::sample::internal::RendererVulkan::OnResize(int32_t _width, int32_t _height)
 {
-
 }
 
 void ozz::sample::internal::RendererVulkan::DrawAxes(const ozz::math::Float4x4 & _transform)
@@ -104,9 +103,9 @@ bool ozz::sample::internal::RendererVulkan::DrawBinormals(ozz::Range<const float
 	return true;
 }
 
-bool ozz::sample::internal::RendererVulkan::InitOpenGLExtensions()
+bool ozz::sample::internal::RendererVulkan::RenderFrame()
 {
-	return true;
+	return context_->drawFrame();
 }
 
 bool ozz::sample::internal::RendererVulkan::InitPostureRendering()

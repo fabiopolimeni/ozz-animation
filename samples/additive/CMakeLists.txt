@@ -30,6 +30,9 @@ target_link_libraries(sample_additive
   sample_framework)
 
 if (WIN32 AND ozz_build_with_vulkan)
+  add_dependencies(sample_additive
+    vulkan_shaders)
+    
   target_link_libraries(sample_additive
     ${VULKAN_LIBRARY})
 endif()

@@ -35,13 +35,6 @@
 //#define VK_NO_PROTOTYPES            // do not declared prototypes, so I can load dynamically!
 #include <vulkan/vulkan.h>
 
-//PFN_vkCreateInstance vkCreateInstance = NULL;
-//PFN_vkDestroyInstance vkDestroyInstance = NULL;
-//PFN_vkDestroySurfaceKHR vkDestroySurfaceKHR = NULL;
-//PFN_vkDestroyDevice vkDestroyDevice = NULL;
-//PFN_vkEnumerateInstanceLayerProperties vkEnumerateInstanceLayerProperties = NULL;
-//PFN_vkGetInstanceProcAddr vkGetInstanceProcAddr = NULL;
-
 #include <functional>
 #include <vector>
 #include <array>
@@ -140,12 +133,12 @@ namespace ozz {
 
 					attributeDescriptions[1].binding = 0;
 					attributeDescriptions[1].location = 1;
-					attributeDescriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;
+					attributeDescriptions[1].format = VK_FORMAT_R8G8B8_UNORM;
 					attributeDescriptions[1].offset = offsetof(Vertex, color);
 
 					attributeDescriptions[2].binding = 0;
 					attributeDescriptions[2].location = 2;
-					attributeDescriptions[2].format = VK_FORMAT_R32G32_SFLOAT;
+					attributeDescriptions[2].format = VK_FORMAT_R8G8_UNORM;
 					attributeDescriptions[2].offset = offsetof(Vertex, texCoord);
 
 					return attributeDescriptions;
@@ -183,6 +176,17 @@ namespace ozz {
 				std::vector<deleter_ptr<VkImageView>> swapChainImageViews;
 				std::vector<deleter_ptr<VkFramebuffer>> swapChainFramebuffers;
 
+				deleter_ptr<VkRenderPass> renderPass{ device, vkDestroyRenderPass };
+				deleter_ptr<VkDescriptorSetLayout> descriptorSetLayout{ device, vkDestroyDescriptorSetLayout };
+				deleter_ptr<VkPipelineLayout> pipelineLayout{ device, vkDestroyPipelineLayout };
+				deleter_ptr<VkPipeline> graphicsPipeline{ device, vkDestroyPipeline };
+
+				deleter_ptr<VkCommandPool> commandPool{ device, vkDestroyCommandPool };
+
+				deleter_ptr<VkImage> depthImage{ device, vkDestroyImage };
+				deleter_ptr<VkDeviceMemory> depthImageMemory{ device, vkFreeMemory };
+				deleter_ptr<VkImageView> depthImageView{ device, vkDestroyImageView };
+
 				bool createInstance();
 				bool setupDebugCallback();
 				bool createSurface();
@@ -190,9 +194,13 @@ namespace ozz {
 				bool createLogicalDevice();
 				bool createSwapChain();
 				bool createSwapChainImageViews();
+				bool createRenderPass();
+				bool createDescriptorSetLayout();
+				bool createGraphicsPipeline();
 
 			public:
 				bool initialize();
+				bool drawFrame();
 			};
 
 		}
