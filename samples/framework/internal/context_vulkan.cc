@@ -1079,6 +1079,7 @@ bool ozz::sample::internal::ContextVulkan::createDescriptorSet()
 
 	VK_CHECK_RESULT(vkAllocateDescriptorSets(device, &allocInfo, &descriptorSet));
 
+	// TODO: ...
 	//VkDescriptorBufferInfo bufferInfo = {};
 	//bufferInfo.buffer = VK_NULL_HANDLE;
 	//bufferInfo.offset = 0;
@@ -1132,8 +1133,7 @@ bool ozz::sample::internal::ContextVulkan::createCommandBuffers()
 		beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 		beginInfo.flags = VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT;
 
-		VK_CHECK_RESULT(vkBeginCommandBuffer(commandBuffers[i], &beginInfo));
-		{
+		VK_CHECK_RESULT(vkBeginCommandBuffer(commandBuffers[i], &beginInfo)); {
 			VkRenderPassBeginInfo renderPassInfo = {};
 			renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
 			renderPassInfo.renderPass = renderPass;
@@ -1148,16 +1148,10 @@ bool ozz::sample::internal::ContextVulkan::createCommandBuffers()
 			renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
 			renderPassInfo.pClearValues = clearValues.data();
 
-			vkCmdBeginRenderPass(commandBuffers[i], &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
-			{
-				// TODO: Bind graphics pipeline, vertex and index buffers and descriptor sets
-				//vkCmdBindPipeline(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
-				//VkBuffer vertexBuffers[] = { vertexBuffer };
-				//VkDeviceSize offsets[] = { 0 };
-				//vkCmdBindVertexBuffers(commandBuffers[i], 0, 1, vertexBuffers, offsets);
-				//vkCmdBindIndexBuffer(commandBuffers[i], indexBuffer, 0, VK_INDEX_TYPE_UINT32);
-				//vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSet, 0, nullptr);
-				//vkCmdDrawIndexed(commandBuffers[i], indices.size(), 1, 0, 0, 0);
+			vkCmdBeginRenderPass(commandBuffers[i], &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE); {
+
+				// TODO: Iterate through all the render states,
+				// while registering their binding and drawing operations.
 
 				vkCmdEndRenderPass(commandBuffers[i]);
 			}
@@ -1191,13 +1185,13 @@ bool ozz::sample::internal::ContextVulkan::initialize() {
 		&& createSwapChain()
 		&& createSwapChainImageViews()
 		&& createRenderPass()
-		&& createDescriptorSetLayout()
-		&& createGraphicsPipeline()
+		//&& createDescriptorSetLayout()
+		//&& createGraphicsPipeline()
 		&& createCommandPool()
 		&& createDepthResources()
 		&& createFramebuffers()
-		&& createDescriptorPool()
-		&& createDescriptorSet()
+		//&& createDescriptorPool()
+		//&& createDescriptorSet()
 		&& createCommandBuffers()
 		&& createSemaphores()
 		;
@@ -1274,7 +1268,7 @@ bool ozz::sample::internal::ContextVulkan::recreateSwapChain()
 	return createSwapChain()
 		&& createSwapChainImageViews()
 		&& createRenderPass()
-		&& createGraphicsPipeline()
+		//&& createGraphicsPipeline()
 		&& createDepthResources()
 		&& createFramebuffers()
 		&& createCommandBuffers();

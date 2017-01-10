@@ -27,6 +27,7 @@
 
 #define OZZ_INCLUDE_PRIVATE_HEADER  // Allows to include private headers.
 
+#include "ozz/base/log.h"
 #include "framework/renderer.h"
 #include "framework/internal/renderer_vulkan.h"
 #include "framework/internal/context_vulkan.h"
@@ -49,6 +50,7 @@ ozz::sample::internal::RendererVulkan::~RendererVulkan()
 bool ozz::sample::internal::RendererVulkan::Initialize()
 {
 	context_ = memory::default_allocator()->New<internal::ContextVulkan>();
+	log::Log() << "Render engine: Vulkan" << std::endl;
 	return context_->initialize();
 }
 
