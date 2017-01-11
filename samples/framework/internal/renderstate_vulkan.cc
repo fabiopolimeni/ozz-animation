@@ -36,8 +36,7 @@ bool ozz::sample::vk::RenderState::onInitResources(internal::ContextVulkan* cont
 	return true;
 }
 
-bool ozz::sample::vk::RenderState::onReleaseResources()
+void ozz::sample::vk::RenderState::onReleaseResources()
 {
 	renderContext = nullptr;
-	return true;
 }

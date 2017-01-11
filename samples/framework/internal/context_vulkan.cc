@@ -555,6 +555,7 @@ bool ozz::sample::internal::ContextVulkan::recreateSwapChain()
 
 bool ozz::sample::internal::ContextVulkan::registerRenderState(vk::RenderState* renderState)
 {
+	vkDeviceWaitIdle(device);
 	if (renderState->onInitResources(this)) {
 		renderStates.push_back(renderState);
 		return true;

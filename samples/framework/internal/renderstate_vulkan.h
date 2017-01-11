@@ -32,11 +32,6 @@
 #error "This header is private, it cannot be included from public headers."
 #endif  // OZZ_INCLUDE_PRIVATE_HEADER
 
-#include "ozz/base/maths/simd_math.h"
-#include "ozz/base/maths/vec_float.h"
-
-#include "framework/internal/tools_vulkan.h"
-
 namespace ozz {
 	namespace sample {
 
@@ -58,7 +53,7 @@ namespace ozz {
 				virtual bool onInitResources(internal::ContextVulkan* context);
 
 				// Gives a chance to release all the owned resources
-				virtual bool onReleaseResources();
+				virtual void onReleaseResources();
 
 				// This function is called when command buffers are recorded,
 				// between vkCmdBeginRenderPass() and vkCmdEndRenderPass.
