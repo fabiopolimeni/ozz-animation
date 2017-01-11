@@ -62,16 +62,26 @@ namespace ozz {
 					ozz::math::Float4x4 proj;
 				};
 
-				struct UpdateData
-				{
-					std::vector<Vertex> vertices;
-					std::vector<uint32_t> indices;
-					UniformBufferObject ubo;
+				struct TextureSamplerObject {
+					const uint8_t*	pixels;
+					uint32_t		width;
+					uint32_t		height;
 				};
 
-				struct InitData
-				{
-					std::string textureFilename;
+				struct UpdateData {
+					enum UpdateFalgs {
+						UDF_VERTEX_BUFFER = 0x01,
+						UDF_INDEX_BUFFER = 0x02,
+						UDF_UNIFORM_OBJECT = 0x04,
+						UDF_TEXTURE_SAMPLER = 0x08,
+						UDF_ALL = UDF_VERTEX_BUFFER | UDF_INDEX_BUFFER | UDF_UNIFORM_OBJECT | UDF_TEXTURE_SAMPLER
+					};
+
+					std::vector<Vertex>		vertices;	// Vertex buffer
+					std::vector<uint32_t>	indices;	// Index buffer
+					UniformBufferObject		ubo;		// MVP
+					TextureSamplerObject	tex;		// Texture is meant to be RGBA
+					uint32_t				flags;		// Used to optimize the state changes;
 				};
 
 			private:
@@ -101,20 +111,22 @@ namespace ozz {
 				vk::deleter_ptr<VkDescriptorPool> descriptorPool{ renderContext->device, vkDestroyDescriptorPool };
 				VkDescriptorSet descriptorSet;
 
+				VkVertexInputBindingDescription getVertexBindingDescription();
+				std::array<VkVertexInputAttributeDescription, 4> getVertexAttributeDescriptions();
+
 				void createDescriptorSetLayout();
 				void createGraphicsPipeline();
-				void createTextureImage();
+				void createTextureImage(const uint8_t* pixels, uint32_t width, uint32_t height);
 				void createTextureImageView();
 				void createTextureSampler();
-				void createVertexBuffer();
-				void createIndexBuffer();
+				void createVertexBuffer(const std::vector<Vertex>& vertex_buffer);
+				void createIndexBuffer(const std::vector<uint32_t>& index_buffer);
 				void createUniformBuffer();
+				void updateUniformBuffer(const UniformBufferObject& ubo);
 				void createDescriptorPool();
 				void createDescriptorSet();
 
 			public:
-
-				ModelRenderState(const InitData& initData);
 
 				// Gives a chance to create the render resources
 				virtual bool onInitResources(internal::ContextVulkan* context) override;

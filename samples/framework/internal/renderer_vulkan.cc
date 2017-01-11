@@ -101,10 +101,7 @@ bool ozz::sample::internal::RendererVulkan::DrawBoxShaded(const ozz::math::Box &
 	for (auto mIt = 0; mIt < _transforms.Size(); ++mIt) {
 		RenderStateInfo& state_info = stateInfos_[RenderStateType::RST_MODEL];
 		if (state_info.numOfInstances >= state_info.stateInstances.size()) {
-
-			vk::ModelRenderState::InitData init_data;
-
-			auto* stateInstance = context_->createRenderState<vk::ModelRenderState>(init_data);
+			auto* stateInstance = context_->createRenderState<vk::ModelRenderState>();
 			state_info.stateInstances.push_back(stateInstance);
 		}
 

@@ -338,7 +338,7 @@ bool ozz::sample::internal::ContextVulkan::createRenderPass()
 	renderPassInfo.dependencyCount = 1;
 	renderPassInfo.pDependencies = &dependency;
 
-	VK_CHECK_RESULT(vkCreateRenderPass(device, &renderPassInfo, nullptr, renderPass.replace()))
+	VK_CHECK_RESULT(vkCreateRenderPass(device, &renderPassInfo, nullptr, renderPass.replace()));
 	return true;
 }
 

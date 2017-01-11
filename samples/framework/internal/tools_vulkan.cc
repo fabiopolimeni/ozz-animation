@@ -405,8 +405,9 @@ namespace ozz {
 				VK_CHECK_RESULT(vkCreateImageView(device, &viewInfo, nullptr, imageView.replace()));
 			}
 
-			void createImage(VkPhysicalDevice physicalDevice, VkDevice device, uint32_t width, uint32_t height, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage,
-				VkMemoryPropertyFlags properties, ozz::sample::vk::deleter_ptr<VkImage>& image, ozz::sample::vk::deleter_ptr<VkDeviceMemory>& imageMemory) {
+			void createImage(VkPhysicalDevice physicalDevice, VkDevice device, uint32_t width, uint32_t height,
+				VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties,
+				deleter_ptr<VkImage>& image, deleter_ptr<VkDeviceMemory>& imageMemory) {
 				VkImageCreateInfo imageInfo = {};
 				imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
 				imageInfo.imageType = VK_IMAGE_TYPE_2D;
@@ -517,6 +518,45 @@ namespace ozz {
 					1, &region
 				);
 			}
+
+			void createBuffer(VkPhysicalDevice physicalDevice, VkDevice device,
+				VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties,
+				deleter_ptr<VkBuffer>& buffer, deleter_ptr<VkDeviceMemory>& bufferMemory) {
+				VkBufferCreateInfo bufferInfo = {};
+				bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+				bufferInfo.size = size;
+				bufferInfo.usage = usage;
+				bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+				VK_CHECK_RESULT(vkCreateBuffer(device, &bufferInfo, nullptr, buffer.replace()));
+
+				VkMemoryRequirements memRequirements;
+				vkGetBufferMemoryRequirements(device, buffer, &memRequirements);
+
+				VkMemoryAllocateInfo allocInfo = {};
+				allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+				allocInfo.allocationSize = memRequirements.size;
+
+				findMemoryType(physicalDevice, memRequirements.memoryTypeBits, properties, allocInfo.memoryTypeIndex);
+
+				VK_CHECK_RESULT(vkAllocateMemory(device, &allocInfo, nullptr, bufferMemory.replace()));
+				VK_CHECK_RESULT(vkBindBufferMemory(device, buffer, bufferMemory, 0));
+			}
+
+			void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size, VkCommandBuffer commandBuffer) {
+				VkBufferCopy copyRegion = {};
+				copyRegion.size = size;
+				vkCmdCopyBuffer(commandBuffer, srcBuffer, dstBuffer, 1, &copyRegion);
+			}
+
+			void reportFail(const char* func, VkResult res, const char* file, int32_t line) {
+				ozz::log::Err() << "Vulkan Fatal Error: " << func << " -> "
+					<< ozz::sample::vk::getErrorString(res)
+					<< " (file: " << file << " at line: " << line << ")" << std::endl;
+				assert(res == VK_SUCCESS);
+				std::exit(EXIT_FAILURE);
+			}
+
 		} // namespace vk
 	} // namespace sample
 } // namespace ozz

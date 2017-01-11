@@ -173,22 +173,19 @@ namespace ozz {
 
 			void copyImage(VkImage srcImage, VkImage dstImage, uint32_t width, uint32_t height, VkCommandBuffer commandBuffer);
 
+			void createBuffer(VkPhysicalDevice physicalDevice, VkDevice device,
+				VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties,
+				deleter_ptr<VkBuffer>& buffer, deleter_ptr<VkDeviceMemory>& bufferMemory);
+
+			void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size, VkCommandBuffer commandBuffer);
+
+			void reportFail(const char* funcCall, VkResult result, const char* file, int32_t line);
+
 		} // namespace vk
 	} // namespace sample
 } // namespace ozz
 
-  // Macro to check and display Vulkan return results
-#define VK_CHECK_RESULT(func)															\
-{																						\
-	VkResult res = (func);																\
-	if (res != VK_SUCCESS)																\
-	{																					\
-		ozz::log::Err() << "Vulkan Fatal Error> " #func " -> "							\
-			<< ozz::sample::vk::getErrorString(res)										\
-			<< " (file: " << __FILE__ << " at line: " << __LINE__ << ")" << std::endl;	\
-		assert(res == VK_SUCCESS);														\
-		std::exit(EXIT_FAILURE);														\
-	}																					\
-}	
+ // Macro to check and display Vulkan return results
+#define VK_CHECK_RESULT(func) if (VkResult res = (func)) ozz::sample::vk::reportFail(#func, res, __FILE__, __LINE__)
 
 #endif // OZZ_SAMPLES_FRAMEWORK_INTERNAL_CONTEXT_VULKAN_H_
