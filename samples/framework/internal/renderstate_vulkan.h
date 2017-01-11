@@ -43,7 +43,7 @@ namespace ozz {
 
 			class RenderState {
 
-			private:
+			protected:
 
 				internal::ContextVulkan* renderContext;
 

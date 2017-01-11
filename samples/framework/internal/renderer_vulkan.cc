@@ -29,8 +29,14 @@
 
 #include "ozz/base/log.h"
 #include "framework/renderer.h"
+#include "framework/camera.h"
 #include "framework/internal/renderer_vulkan.h"
 #include "framework/internal/context_vulkan.h"
+#include "framework/internal/model_vulkan.h"
+#include "framework/internal/mesh_vulkan.h"
+#include "framework/internal/line_vulkan.h"
+#include "framework/internal/skeleton_vulkan.h"
+
 #include "glfw/glfw3.h"
 
 // TODO: Remove this warning disable instruction once all functions have been implemented
@@ -49,8 +55,16 @@ ozz::sample::internal::RendererVulkan::~RendererVulkan()
 
 bool ozz::sample::internal::RendererVulkan::Initialize()
 {
-	context_ = memory::default_allocator()->New<internal::ContextVulkan>();
 	log::Log() << "Render engine: Vulkan" << std::endl;
+
+	// Initialise to default values the render state infos
+	for (auto rsiIt = 0; rsiIt < RenderStateType::RST_MAX; ++rsiIt) {
+		auto& rsi = stateInfos_[rsiIt];
+		rsi.stateType = (RenderStateType)rsiIt;
+		rsi.numOfInstances = 0;
+	}
+
+	context_ = memory::default_allocator()->New<internal::ContextVulkan>();
 	return context_->initialize();
 }
 
@@ -84,6 +98,49 @@ bool ozz::sample::internal::RendererVulkan::DrawBoxIm(const ozz::math::Box & _bo
 
 bool ozz::sample::internal::RendererVulkan::DrawBoxShaded(const ozz::math::Box & _box, ozz::Range<const ozz::math::Float4x4> _transforms, Color _color)
 {
+	for (auto mIt = 0; mIt < _transforms.Size(); ++mIt) {
+		RenderStateInfo& state_info = stateInfos_[RenderStateType::RST_MODEL];
+		if (state_info.numOfInstances >= state_info.stateInstances.size()) {
+
+			vk::ModelRenderState::InitData init_data;
+
+			auto* stateInstance = context_->createRenderState<vk::ModelRenderState>(init_data);
+			state_info.stateInstances.push_back(stateInstance);
+		}
+
+		auto* model_render_state = static_cast<vk::ModelRenderState*>(state_info.stateInstances[state_info.numOfInstances++]);
+
+		vk::ModelRenderState::UpdateData update_data;
+
+		// front-face
+		{
+			std::vector<vk::ModelRenderState::Vertex> front_face = {
+				//				position									color											normal										uvs
+				{ ozz::math::Float3(-0.5f, -0.5f, 0.5f), ozz::math::Float3(_color.r, _color.g, _color.b), ozz::math::Float3(0.0f, 0.0f, 1.0f), ozz::math::Float2(0.0f, 0.0f) },
+				{ ozz::math::Float3(0.5f, -0.5f, 0.5f), ozz::math::Float3(_color.r, _color.g, _color.b), ozz::math::Float3(0.0f, 0.0f, 1.0f), ozz::math::Float2(1.0f, 0.0f) },
+				{ ozz::math::Float3(0.5f,  0.5f, 0.5f), ozz::math::Float3(_color.r, _color.g, _color.b), ozz::math::Float3(0.0f, 0.0f, 1.0f), ozz::math::Float2(1.0f, 1.0f) },
+				{ ozz::math::Float3(-0.5f,  0.5f, 0.5f), ozz::math::Float3(_color.r, _color.g, _color.b), ozz::math::Float3(0.0f, 0.0f, 1.0f), ozz::math::Float2(0.0f, 1.0f) }
+			};
+
+			uint32_t start_index = static_cast<uint32_t>(update_data.vertices.size());
+			update_data.indices.insert(std::begin(update_data.indices), { start_index + 0, start_index + 1, start_index + 2, start_index + 2, start_index + 3, start_index + 0 });
+			update_data.vertices.insert(std::begin(update_data.vertices), std::begin(front_face), std::begin(front_face));
+		}
+
+		// TODO: ...
+		// back-face
+		// top-face
+		// bottom-face
+		// right-face
+		// left-face
+
+		// Uniform data
+		update_data.ubo.model = _transforms[mIt];
+		update_data.ubo.view = camera_->view();
+		update_data.ubo.proj = camera_->projection();
+
+		model_render_state->update(update_data);
+	}
 	return true;
 }
 
@@ -109,6 +166,11 @@ bool ozz::sample::internal::RendererVulkan::DrawBinormals(ozz::Range<const float
 
 bool ozz::sample::internal::RendererVulkan::RenderFrame()
 {
+	// Reset numOfInstance of each render state.
+	for (auto& rsi : stateInfos_) {
+		rsi.numOfInstances = 0;
+	}
+
 	return context_->drawFrame();
 }
 

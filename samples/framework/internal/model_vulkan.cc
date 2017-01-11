@@ -28,7 +28,11 @@
 #define OZZ_INCLUDE_PRIVATE_HEADER  // Allows to include private headers.
 
 #include "framework/internal/model_vulkan.h"
-#include "framework/internal/context_vulkan.h"
+
+ozz::sample::vk::ModelRenderState::ModelRenderState(const InitData& initData)
+{
+
+}
 
 bool ozz::sample::vk::ModelRenderState::onInitResources(internal::ContextVulkan* context)
 {
@@ -46,6 +50,11 @@ void ozz::sample::vk::ModelRenderState::onReleaseResources()
 }
 
 bool ozz::sample::vk::ModelRenderState::onRegisterRenderPass()
+{
+	return true;
+}
+
+bool ozz::sample::vk::ModelRenderState::update(const UpdateData& /*updateData*/)
 {
 	return true;
 }

@@ -32,6 +32,9 @@
 #error "This header is private, it cannot be included from public headers."
 #endif  // OZZ_INCLUDE_PRIVATE_HEADER
 
+#include <vector>
+#include <array>
+
 #include "framework/renderer.h"
 #include "ozz/base/containers/vector.h"
 
@@ -48,6 +51,10 @@ namespace ozz {
 	namespace sample {
 		class Camera;
 		class Shader;
+
+		namespace vk {
+			class RenderState;
+		}
 
 		namespace internal {
 
@@ -138,15 +145,42 @@ namespace ozz {
 					const float* _uniforms, int _instance_count,
 					bool _draw_joints);
 
-				// Array of matrices used to store model space matrices during DrawSkeleton
-				// execution.
-				ozz::Range<ozz::math::Float4x4> prealloc_models_;
-
 				// Application camera that provides rendering matrices.
 				Camera* camera_;
 
 				// Vulkan context handler
 				ContextVulkan* context_;
+
+				enum RenderStateType
+				{
+					RST_MODEL = 0,
+					RST_MESH,
+					RST_SKELETON,
+					RST_LINE,
+
+					RST_MAX
+				};
+
+				// We keep this structure to determine whether or not a new render state instance
+				// of this type needs to be allocated. Because we do store the base class of
+				// the render state, we need stateType for picking the correct implementation at
+				// runtime. This is due to the fact that if we already have enough render states
+				// of the requested type, we don't need to create a new one, but simply update
+				// any existing one. Each render state though, has its own unique update signature,
+				// therefore, we need to use specific input parameters determined at runtime.
+				// For each frame, when a "draw" routine is invoked, we check the numOfInstances,
+				// if this is greater or equal to the size of vector of instances, a new render
+				// state will be created and pushed into the vector, the ith-element, pointed by
+				// numOfInstance-1 will be used to access and update a render state otherwise.
+				// After each frame is drew, numOfInstance of each stateType, will be reset to 0.
+				struct RenderStateInfo
+				{
+					RenderStateType					stateType;
+					uint32_t						numOfInstances;
+					std::vector<vk::RenderState*>	stateInstances;
+				};
+
+				std::array<RenderStateInfo, RenderStateType::RST_MAX> stateInfos_;
 
 			};
 		}  // internal

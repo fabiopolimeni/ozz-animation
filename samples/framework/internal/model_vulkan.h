@@ -32,7 +32,14 @@
 #error "This header is private, it cannot be included from public headers."
 #endif  // OZZ_INCLUDE_PRIVATE_HEADER
 
+#include <vector>
+
+#include "ozz/base/maths/vec_float.h"
+#include "ozz/base/maths/simd_math.h"
+
 #include "framework/internal/renderstate_vulkan.h"
+#include "framework/internal/tools_vulkan.h"
+#include "framework/internal/context_vulkan.h"
 
 namespace ozz {
 	namespace sample {
@@ -41,6 +48,73 @@ namespace ozz {
 			class ModelRenderState : public RenderState {
 
 			public:
+				
+				struct Vertex {
+					ozz::math::Float3 pos;
+					ozz::math::Float3 color;
+					ozz::math::Float3 normal;
+					ozz::math::Float2 uv;
+				};
+
+				struct UniformBufferObject {
+					ozz::math::Float4x4 model;
+					ozz::math::Float4x4 view;
+					ozz::math::Float4x4 proj;
+				};
+
+				struct UpdateData
+				{
+					std::vector<Vertex> vertices;
+					std::vector<uint32_t> indices;
+					UniformBufferObject ubo;
+				};
+
+				struct InitData
+				{
+					std::string textureFilename;
+				};
+
+			private:
+
+				std::vector<Vertex> vertices;
+				std::vector<uint32_t> indices;
+
+				vk::deleter_ptr<VkDescriptorSetLayout> descriptorSetLayout{ renderContext->device, vkDestroyDescriptorSetLayout };
+				vk::deleter_ptr<VkPipelineLayout> pipelineLayout{ renderContext->device, vkDestroyPipelineLayout };
+				vk::deleter_ptr<VkPipeline> graphicsPipeline{ renderContext->device, vkDestroyPipeline };
+
+				vk::deleter_ptr<VkImage> textureImage{ renderContext->device, vkDestroyImage };
+				vk::deleter_ptr<VkDeviceMemory> textureImageMemory{ renderContext->device, vkFreeMemory };
+				vk::deleter_ptr<VkImageView> textureImageView{ renderContext->device, vkDestroyImageView };
+				vk::deleter_ptr<VkSampler> textureSampler{ renderContext->device, vkDestroySampler };
+
+				vk::deleter_ptr<VkBuffer> vertexBuffer{ renderContext->device, vkDestroyBuffer };
+				vk::deleter_ptr<VkDeviceMemory> vertexBufferMemory{ renderContext->device, vkFreeMemory };
+				vk::deleter_ptr<VkBuffer> indexBuffer{ renderContext->device, vkDestroyBuffer };
+				vk::deleter_ptr<VkDeviceMemory> indexBufferMemory{ renderContext->device, vkFreeMemory };
+
+				vk::deleter_ptr<VkBuffer> uniformStagingBuffer{ renderContext->device, vkDestroyBuffer };
+				vk::deleter_ptr<VkDeviceMemory> uniformStagingBufferMemory{ renderContext->device, vkFreeMemory };
+				vk::deleter_ptr<VkBuffer> uniformBuffer{ renderContext->device, vkDestroyBuffer };
+				vk::deleter_ptr<VkDeviceMemory> uniformBufferMemory{ renderContext->device, vkFreeMemory };
+
+				vk::deleter_ptr<VkDescriptorPool> descriptorPool{ renderContext->device, vkDestroyDescriptorPool };
+				VkDescriptorSet descriptorSet;
+
+				void createDescriptorSetLayout();
+				void createGraphicsPipeline();
+				void createTextureImage();
+				void createTextureImageView();
+				void createTextureSampler();
+				void createVertexBuffer();
+				void createIndexBuffer();
+				void createUniformBuffer();
+				void createDescriptorPool();
+				void createDescriptorSet();
+
+			public:
+
+				ModelRenderState(const InitData& initData);
 
 				// Gives a chance to create the render resources
 				virtual bool onInitResources(internal::ContextVulkan* context) override;
@@ -51,6 +125,8 @@ namespace ozz {
 				// This function is called when command buffers are recorded,
 				// between vkCmdBeginRenderPass() and vkCmdEndRenderPass.
 				virtual bool onRegisterRenderPass() override;
+
+				bool update(const UpdateData& updateData);
 
 			};
 

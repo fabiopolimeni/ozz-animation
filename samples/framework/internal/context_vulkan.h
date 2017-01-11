@@ -35,6 +35,7 @@
 #include <functional>
 #include <vector>
 #include <array>
+#include <type_traits>
 
 #include "ozz/base/maths/simd_math.h"
 #include "ozz/base/maths/vec_float.h"
@@ -46,6 +47,7 @@ namespace ozz {
 
 		namespace vk {
 			class RenderState;
+			class ModelRenderState;
 		}
 
 		namespace internal {
@@ -58,6 +60,9 @@ namespace ozz {
 			// Manages all the boilerplate needed to handle Vulkan
 			class ContextVulkan {
 			private:
+
+				friend class vk::RenderState;
+				friend class vk::ModelRenderState;
 
 				vk::deleter_ptr<VkInstance> instance{ vkDestroyInstance };
 				vk::deleter_ptr<VkDebugReportCallbackEXT> callback{ instance, DestroyDebugReportCallbackEXT };
@@ -115,15 +120,15 @@ namespace ozz {
 				bool drawFrame();
 				bool recreateSwapChain();
 
-				template<typename T>
-				vk::RenderState* createRenderState();
+				template<typename T, class... Args>
+				vk::RenderState* createRenderState(Args&&... args);
 				void destroyRenderState(vk::RenderState* renderState);
 			};
 
-			template<typename T>
-			vk::RenderState* ozz::sample::internal::ContextVulkan::createRenderState()
+			template<typename T, class... Args>
+			vk::RenderState* ozz::sample::internal::ContextVulkan::createRenderState(Args&&... args)
 			{
-				vk::RenderState* renderState = memory::default_allocator()->New<T>();
+				vk::RenderState* renderState = memory::default_allocator()->New<T>(std::forward<Args>(args)...);
 				if (!registerRenderState(renderState)) {
 					memory::default_allocator()->Delete(renderState);
 					renderState = nullptr;
