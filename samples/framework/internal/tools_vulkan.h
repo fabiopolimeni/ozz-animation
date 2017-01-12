@@ -103,9 +103,7 @@ namespace ozz {
 			std::string getErrorString(VkResult errorCode);
 			
 			bool checkValidationLayerSupport(const std::vector<const char*>& validationLayers);
-
-			std::vector<const char*> getRequiredExtensions();
-
+			
 			VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
 				VkDebugReportFlagsEXT flags,
 				VkDebugReportObjectTypeEXT /*objType*/,
@@ -141,7 +139,7 @@ namespace ozz {
 
 			VkPresentModeKHR chooseSwapPresentMode(const std::vector<VkPresentModeKHR> availablePresentModes);
 
-			VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities);
+			VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities, int32_t width, int32_t height);
 
 			VkFormat findSupportedFormat(VkPhysicalDevice physicalDevice, const std::vector<VkFormat>& candidates,
 				VkImageTiling tiling, VkFormatFeatureFlags features);
@@ -185,7 +183,10 @@ namespace ozz {
 	} // namespace sample
 } // namespace ozz
 
- // Macro to check and display Vulkan return results
-#define VK_CHECK_RESULT(func) if (VkResult res = (func)) ozz::sample::vk::reportFail(#func, res, __FILE__, __LINE__)
+// Macro to check invalid statement
+#define CHECK_AND_REPORT(cond, msg) if (!cond) ozz::sample::vk::reportFail(msg, VK_SUCCESS, __FILE__, __LINE__)
+
+// Macro to check Vulkan return results. We can do the follow because VK_SUCCESS == 0
+#define CHECK_VK_RESULT(func) if (VkResult res = (func)) ozz::sample::vk::reportFail(#func, res, __FILE__, __LINE__)
 
 #endif // OZZ_SAMPLES_FRAMEWORK_INTERNAL_CONTEXT_VULKAN_H_

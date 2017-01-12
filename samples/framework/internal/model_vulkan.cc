@@ -50,17 +50,17 @@ std::array<VkVertexInputAttributeDescription, 4> ozz::sample::vk::ModelRenderSta
 	attributeDescriptions[1].binding = 0;
 	attributeDescriptions[1].location = 1;
 	attributeDescriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;
-	attributeDescriptions[1].offset = offsetof(Vertex, color);
+	attributeDescriptions[1].offset = offsetof(Vertex, normal);
 
 	attributeDescriptions[2].binding = 0;
-	attributeDescriptions[2].location = 1;
-	attributeDescriptions[2].format = VK_FORMAT_R32G32B32_SFLOAT;
-	attributeDescriptions[2].offset = offsetof(Vertex, normal);
+	attributeDescriptions[2].location = 2;
+	attributeDescriptions[2].format = VK_FORMAT_R32G32_SFLOAT;
+	attributeDescriptions[2].offset = offsetof(Vertex, uv);
 
 	attributeDescriptions[3].binding = 0;
-	attributeDescriptions[3].location = 2;
-	attributeDescriptions[3].format = VK_FORMAT_R32G32_SFLOAT;
-	attributeDescriptions[3].offset = offsetof(Vertex, uv);
+	attributeDescriptions[3].location = 3;
+	attributeDescriptions[3].format = VK_FORMAT_B8G8R8A8_UNORM;
+	attributeDescriptions[3].offset = offsetof(Vertex, color);
 
 	return attributeDescriptions;
 }
@@ -86,7 +86,7 @@ void ozz::sample::vk::ModelRenderState::createDescriptorSetLayout() {
 	layoutInfo.bindingCount = static_cast<uint32_t>(bindings.size());
 	layoutInfo.pBindings = bindings.data();
 
-	VK_CHECK_RESULT(vkCreateDescriptorSetLayout(renderContext->device, &layoutInfo, nullptr, descriptorSetLayout.replace()));
+	CHECK_VK_RESULT(vkCreateDescriptorSetLayout(renderContext->device, &layoutInfo, nullptr, descriptorSetLayout.replace()));
 }
 
 void ozz::sample::vk::ModelRenderState::createGraphicsPipeline() {
@@ -94,10 +94,7 @@ void ozz::sample::vk::ModelRenderState::createGraphicsPipeline() {
 	std::vector<char> fragShaderCode;
 	bool validShaders = vk::readFile("../shaders/vert.spv", vertShaderCode) && vk::readFile("../shaders/frag.spv", fragShaderCode);
 
-	if (!validShaders) {
-		ozz::log::Err() << "Failed to load shader code. The graphics pipeline cannot be created!" << std::endl;
-		return;
-	}
+	CHECK_AND_REPORT(validShaders, "Failed to load shader code. The graphics pipeline cannot be created!");
 
 	deleter_ptr<VkShaderModule> vertShaderModule{ renderContext->device, vkDestroyShaderModule };
 	deleter_ptr<VkShaderModule> fragShaderModule{ renderContext->device, vkDestroyShaderModule };
@@ -197,7 +194,7 @@ void ozz::sample::vk::ModelRenderState::createGraphicsPipeline() {
 	pipelineLayoutInfo.setLayoutCount = 1;
 	pipelineLayoutInfo.pSetLayouts = setLayouts;
 
-	VK_CHECK_RESULT(vkCreatePipelineLayout(renderContext->device, &pipelineLayoutInfo, nullptr, pipelineLayout.replace()));
+	CHECK_VK_RESULT(vkCreatePipelineLayout(renderContext->device, &pipelineLayoutInfo, nullptr, pipelineLayout.replace()));
 
 	VkGraphicsPipelineCreateInfo pipelineInfo = {};
 	pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
@@ -215,7 +212,7 @@ void ozz::sample::vk::ModelRenderState::createGraphicsPipeline() {
 	pipelineInfo.subpass = 0;
 	pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
 
-	VK_CHECK_RESULT(vkCreateGraphicsPipelines(renderContext->device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, graphicsPipeline.replace()));
+	CHECK_VK_RESULT(vkCreateGraphicsPipelines(renderContext->device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, graphicsPipeline.replace()));
 }
 
 void ozz::sample::vk::ModelRenderState::createTextureImage(const uint8_t* pixels, uint32_t width, uint32_t height) {
@@ -238,19 +235,20 @@ void ozz::sample::vk::ModelRenderState::createTextureImage(const uint8_t* pixels
 	VkDeviceSize imageSize = width * height * 4;
 
 	vkMapMemory(renderContext->device, stagingImageMemory, 0, imageSize, 0, &data);
-
-	if (stagingImageLayout.rowPitch == width * 4) {
-		memcpy(data, pixels, (size_t)imageSize);
-	}
-	else {
-		uint8_t* dataBytes = reinterpret_cast<uint8_t*>(data);
-
-		for (uint32_t y = 0; y < height; y++) {
-			memcpy(&dataBytes[y * stagingImageLayout.rowPitch], &pixels[y * width * 4], width * 4);
+	{
+		if (stagingImageLayout.rowPitch == width * 4) {
+			memcpy(data, pixels, (size_t)imageSize);
 		}
-	}
+		else {
+			uint8_t* dataBytes = reinterpret_cast<uint8_t*>(data);
 
-	vkUnmapMemory(renderContext->device, stagingImageMemory);
+			for (uint32_t y = 0; y < height; y++) {
+				memcpy(&dataBytes[y * stagingImageLayout.rowPitch], &pixels[y * width * 4], width * 4);
+			}
+		}
+
+		vkUnmapMemory(renderContext->device, stagingImageMemory);
+	}
 
 	createImage(renderContext->physicalDevice, renderContext->device, width, height,
 		VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TILING_OPTIMAL,
@@ -289,7 +287,7 @@ void ozz::sample::vk::ModelRenderState::createTextureSampler() {
 	samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
 	samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
 
-	VK_CHECK_RESULT(vkCreateSampler(renderContext->device, &samplerInfo, nullptr, textureSampler.replace()));
+	CHECK_VK_RESULT(vkCreateSampler(renderContext->device, &samplerInfo, nullptr, textureSampler.replace()));
 }
 
 void ozz::sample::vk::ModelRenderState::createVertexBuffer(const std::vector<Vertex>& vertex_buffer) {
@@ -304,8 +302,10 @@ void ozz::sample::vk::ModelRenderState::createVertexBuffer(const std::vector<Ver
 
 	void* data;
 	vkMapMemory(renderContext->device, stagingBufferMemory, 0, bufferSize, 0, &data);
-	memcpy(data, vertices.data(), (size_t)bufferSize);
-	vkUnmapMemory(renderContext->device, stagingBufferMemory);
+	{
+		memcpy(data, vertices.data(), (size_t)bufferSize);
+		vkUnmapMemory(renderContext->device, stagingBufferMemory);
+	}
 
 	createBuffer(renderContext->physicalDevice, renderContext->device, bufferSize,
 		VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
@@ -330,8 +330,10 @@ void ozz::sample::vk::ModelRenderState::createIndexBuffer(const std::vector<uint
 
 	void* data;
 	vkMapMemory(renderContext->device, stagingBufferMemory, 0, bufferSize, 0, &data);
-	memcpy(data, indices.data(), (size_t)bufferSize);
-	vkUnmapMemory(renderContext->device, stagingBufferMemory);
+	{
+		memcpy(data, indices.data(), (size_t)bufferSize);
+		vkUnmapMemory(renderContext->device, stagingBufferMemory);
+	}
 
 	createBuffer(renderContext->physicalDevice, renderContext->device, bufferSize,
 		VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
@@ -357,8 +359,11 @@ void ozz::sample::vk::ModelRenderState::updateUniformBuffer(const UniformBufferO
 {
 	void* data;
 	vkMapMemory(renderContext->device, uniformStagingBufferMemory, 0, sizeof(ubo), 0, &data);
-	memcpy(data, &ubo, sizeof(ubo));
-	vkUnmapMemory(renderContext->device, uniformStagingBufferMemory);
+	{
+		memcpy(data, &ubo, sizeof(ubo));
+		vkUnmapMemory(renderContext->device, uniformStagingBufferMemory);
+	}
+
 	VkCommandBuffer commandBuffer = beginSingleTimeCommand(renderContext->device, renderContext->commandPool);
 	{
 		copyBuffer(uniformStagingBuffer, uniformBuffer, sizeof(ubo), commandBuffer);
@@ -379,7 +384,7 @@ void ozz::sample::vk::ModelRenderState::createDescriptorPool() {
 	poolInfo.pPoolSizes = poolSizes.data();
 	poolInfo.maxSets = 1;
 
-	VK_CHECK_RESULT(vkCreateDescriptorPool(renderContext->device, &poolInfo, nullptr, descriptorPool.replace()));
+	CHECK_VK_RESULT(vkCreateDescriptorPool(renderContext->device, &poolInfo, nullptr, descriptorPool.replace()));
 }
 
 void ozz::sample::vk::ModelRenderState::createDescriptorSet() {
@@ -390,7 +395,7 @@ void ozz::sample::vk::ModelRenderState::createDescriptorSet() {
 	allocInfo.descriptorSetCount = 1;
 	allocInfo.pSetLayouts = layouts;
 
-	VK_CHECK_RESULT(vkAllocateDescriptorSets(renderContext->device, &allocInfo, &descriptorSet));
+	CHECK_VK_RESULT(vkAllocateDescriptorSets(renderContext->device, &allocInfo, &descriptorSet));
 
 	VkDescriptorBufferInfo bufferInfo = {};
 	bufferInfo.buffer = uniformBuffer;

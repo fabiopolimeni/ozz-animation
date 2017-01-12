@@ -38,10 +38,6 @@
 #include <sstream>
 #include <set>
 
-#include "glfw/glfw3.h"
-
-extern GLFWwindow* g_glfwWindow;
-
 namespace ozz {
 	namespace sample {
 		namespace vk {
@@ -98,21 +94,6 @@ namespace ozz {
 				}
 
 				return false;
-			}
-
-			std::vector<const char*> getRequiredExtensions() {
-				std::vector<const char*> extensions;
-
-				unsigned int glfwExtensionCount = 0;
-				const char** glfwExtensions;
-				glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
-
-				for (unsigned int i = 0; i < glfwExtensionCount; i++) {
-					extensions.push_back(glfwExtensions[i]);
-				}
-
-				extensions.push_back(VK_EXT_DEBUG_REPORT_EXTENSION_NAME);
-				return extensions;
 			}
 
 			VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
@@ -271,15 +252,12 @@ namespace ozz {
 				return VK_PRESENT_MODE_FIFO_KHR;
 			}
 
-			VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities) {
+			VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities, int32_t width, int32_t height) {
 				if (capabilities.currentExtent.width != std::numeric_limits<uint32_t>::max()) {
 					return capabilities.currentExtent;
 				}
 				else {
-					int32_t width_, height_;
-					glfwGetFramebufferSize(g_glfwWindow, &width_, &height_);
-
-					VkExtent2D actualExtent = { static_cast<uint32_t>(width_), static_cast<uint32_t>(height_) };
+					VkExtent2D actualExtent = { static_cast<uint32_t>(width), static_cast<uint32_t>(height) };
 					actualExtent.width = std::max(capabilities.minImageExtent.width, std::min(capabilities.maxImageExtent.width, actualExtent.width));
 					actualExtent.height = std::max(capabilities.minImageExtent.height, std::min(capabilities.maxImageExtent.height, actualExtent.height));
 
@@ -335,7 +313,7 @@ namespace ozz {
 				createInfo.codeSize = code.size();
 				createInfo.pCode = (uint32_t*)code.data();
 
-				VK_CHECK_RESULT(vkCreateShaderModule(device, &createInfo, nullptr, shaderModule.replace()));
+				CHECK_VK_RESULT(vkCreateShaderModule(device, &createInfo, nullptr, shaderModule.replace()));
 			}
 
 			VkCommandBuffer beginSingleTimeCommand(VkDevice device, VkCommandPool commandPool) {
@@ -402,7 +380,7 @@ namespace ozz {
 				viewInfo.subresourceRange.baseArrayLayer = 0;
 				viewInfo.subresourceRange.layerCount = 1;
 
-				VK_CHECK_RESULT(vkCreateImageView(device, &viewInfo, nullptr, imageView.replace()));
+				CHECK_VK_RESULT(vkCreateImageView(device, &viewInfo, nullptr, imageView.replace()));
 			}
 
 			void createImage(VkPhysicalDevice physicalDevice, VkDevice device, uint32_t width, uint32_t height,
@@ -423,7 +401,7 @@ namespace ozz {
 				imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
 				imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
-				VK_CHECK_RESULT(vkCreateImage(device, &imageInfo, nullptr, image.replace()));
+				CHECK_VK_RESULT(vkCreateImage(device, &imageInfo, nullptr, image.replace()));
 
 				VkMemoryRequirements memRequirements;
 				vkGetImageMemoryRequirements(device, image, &memRequirements);
@@ -434,8 +412,8 @@ namespace ozz {
 
 				findMemoryType(physicalDevice, memRequirements.memoryTypeBits, properties, allocInfo.memoryTypeIndex);
 
-				VK_CHECK_RESULT(vkAllocateMemory(device, &allocInfo, nullptr, imageMemory.replace()));
-				VK_CHECK_RESULT(vkBindImageMemory(device, image, imageMemory, 0));
+				CHECK_VK_RESULT(vkAllocateMemory(device, &allocInfo, nullptr, imageMemory.replace()));
+				CHECK_VK_RESULT(vkBindImageMemory(device, image, imageMemory, 0));
 			}
 
 			bool transitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout, VkCommandBuffer commandBuffer) {
@@ -528,7 +506,7 @@ namespace ozz {
 				bufferInfo.usage = usage;
 				bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
-				VK_CHECK_RESULT(vkCreateBuffer(device, &bufferInfo, nullptr, buffer.replace()));
+				CHECK_VK_RESULT(vkCreateBuffer(device, &bufferInfo, nullptr, buffer.replace()));
 
 				VkMemoryRequirements memRequirements;
 				vkGetBufferMemoryRequirements(device, buffer, &memRequirements);
@@ -539,8 +517,8 @@ namespace ozz {
 
 				findMemoryType(physicalDevice, memRequirements.memoryTypeBits, properties, allocInfo.memoryTypeIndex);
 
-				VK_CHECK_RESULT(vkAllocateMemory(device, &allocInfo, nullptr, bufferMemory.replace()));
-				VK_CHECK_RESULT(vkBindBufferMemory(device, buffer, bufferMemory, 0));
+				CHECK_VK_RESULT(vkAllocateMemory(device, &allocInfo, nullptr, bufferMemory.replace()));
+				CHECK_VK_RESULT(vkBindBufferMemory(device, buffer, bufferMemory, 0));
 			}
 
 			void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size, VkCommandBuffer commandBuffer) {

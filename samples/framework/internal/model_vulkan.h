@@ -50,10 +50,12 @@ namespace ozz {
 			public:
 				
 				struct Vertex {
-					ozz::math::Float3 pos;
-					ozz::math::Float3 color;
-					ozz::math::Float3 normal;
-					ozz::math::Float2 uv;
+					ozz::math::Float3	pos;
+					ozz::math::Float3	normal;
+					ozz::math::Float2	uv;
+					struct {
+						uint8_t r, g, b, a;
+					} color;
 				};
 
 				struct UniformBufferObject {
@@ -138,6 +140,7 @@ namespace ozz {
 				// between vkCmdBeginRenderPass() and vkCmdEndRenderPass.
 				virtual bool onRegisterRenderPass() override;
 
+				// Update render state according to the flags
 				bool update(const UpdateData& updateData);
 
 			};

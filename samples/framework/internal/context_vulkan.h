@@ -103,7 +103,7 @@ namespace ozz {
 				bool createSurface();
 				bool pickPhysicalDevice();
 				bool createLogicalDevice();
-				bool createSwapChain();
+				bool createSwapChain(int32_t width, int32_t height);
 				bool createSwapChainImageViews();
 				bool createRenderPass();
 				bool createCommandPool();

@@ -70,6 +70,23 @@ void ozz::sample::internal::DestroyDebugReportCallbackEXT(VkInstance instance, V
 	}
 }
 
+namespace {
+	std::vector<const char*> getRequiredExtensions() {
+		std::vector<const char*> extensions;
+
+		unsigned int glfwExtensionCount = 0;
+		const char** glfwExtensions;
+		glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
+
+		for (unsigned int i = 0; i < glfwExtensionCount; i++) {
+			extensions.push_back(glfwExtensions[i]);
+		}
+
+		extensions.push_back(VK_EXT_DEBUG_REPORT_EXTENSION_NAME);
+		return extensions;
+	}
+}
+
 bool ozz::sample::internal::ContextVulkan::createInstance() {
 	if (g_enableValidationLayers && !vk::checkValidationLayerSupport(g_validationLayers)) {
 		ozz::log::Err() << "Validation layers requested, but not available!" << std::endl;
@@ -88,7 +105,7 @@ bool ozz::sample::internal::ContextVulkan::createInstance() {
 	createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
 	createInfo.pApplicationInfo = &appInfo;
 
-	auto extensions = vk::getRequiredExtensions();
+	auto extensions = getRequiredExtensions();
 	if (g_enableValidationLayers) {
 		extensions.push_back(VK_EXT_DEBUG_REPORT_EXTENSION_NAME);
 	}
@@ -213,12 +230,12 @@ bool ozz::sample::internal::ContextVulkan::createLogicalDevice() {
 	return true;
 }
 
-bool ozz::sample::internal::ContextVulkan::createSwapChain() {
+bool ozz::sample::internal::ContextVulkan::createSwapChain(int32_t width, int32_t height) {
 	vk::SwapChainSupportDetails swapChainSupport = vk::querySwapChainSupport(physicalDevice, surface);
 
 	VkSurfaceFormatKHR surfaceFormat = vk::chooseSwapSurfaceFormat(swapChainSupport.formats);
 	VkPresentModeKHR presentMode = vk::chooseSwapPresentMode(swapChainSupport.presentModes);
-	VkExtent2D extent = vk::chooseSwapExtent(swapChainSupport.capabilities);
+	VkExtent2D extent = vk::chooseSwapExtent(swapChainSupport.capabilities, width, height);
 
 	uint32_t imageCount = swapChainSupport.capabilities.minImageCount + 1;
 	if (swapChainSupport.capabilities.maxImageCount > 0 && imageCount > swapChainSupport.capabilities.maxImageCount) {
@@ -338,7 +355,7 @@ bool ozz::sample::internal::ContextVulkan::createRenderPass()
 	renderPassInfo.dependencyCount = 1;
 	renderPassInfo.pDependencies = &dependency;
 
-	VK_CHECK_RESULT(vkCreateRenderPass(device, &renderPassInfo, nullptr, renderPass.replace()));
+	CHECK_VK_RESULT(vkCreateRenderPass(device, &renderPassInfo, nullptr, renderPass.replace()));
 	return true;
 }
 
@@ -350,7 +367,7 @@ bool ozz::sample::internal::ContextVulkan::createCommandPool()
 	poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
 	poolInfo.queueFamilyIndex = queueFamilyIndices.graphicsFamily;
 
-	VK_CHECK_RESULT(vkCreateCommandPool(device, &poolInfo, nullptr, commandPool.replace()));
+	CHECK_VK_RESULT(vkCreateCommandPool(device, &poolInfo, nullptr, commandPool.replace()));
 	return true;
 }
 
@@ -387,7 +404,7 @@ bool ozz::sample::internal::ContextVulkan::createFramebuffers()
 		framebufferInfo.height = swapChainExtent.height;
 		framebufferInfo.layers = 1;
 
-		VK_CHECK_RESULT(vkCreateFramebuffer(device, &framebufferInfo, nullptr, swapChainFramebuffers[i].replace()));
+		CHECK_VK_RESULT(vkCreateFramebuffer(device, &framebufferInfo, nullptr, swapChainFramebuffers[i].replace()));
 	}
 
 	return true;
@@ -407,14 +424,14 @@ bool ozz::sample::internal::ContextVulkan::createCommandBuffers()
 	allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
 	allocInfo.commandBufferCount = (uint32_t)commandBuffers.size();
 
-	VK_CHECK_RESULT(vkAllocateCommandBuffers(device, &allocInfo, commandBuffers.data()));
+	CHECK_VK_RESULT(vkAllocateCommandBuffers(device, &allocInfo, commandBuffers.data()));
 
 	for (size_t i = 0; i < commandBuffers.size(); i++) {
 		VkCommandBufferBeginInfo beginInfo = {};
 		beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 		beginInfo.flags = VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT;
 
-		VK_CHECK_RESULT(vkBeginCommandBuffer(commandBuffers[i], &beginInfo)); {
+		CHECK_VK_RESULT(vkBeginCommandBuffer(commandBuffers[i], &beginInfo)); {
 			VkRenderPassBeginInfo renderPassInfo = {};
 			renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
 			renderPassInfo.renderPass = renderPass;
@@ -440,7 +457,7 @@ bool ozz::sample::internal::ContextVulkan::createCommandBuffers()
 				vkCmdEndRenderPass(commandBuffers[i]);
 			}
 
-			VK_CHECK_RESULT(vkEndCommandBuffer(commandBuffers[i]));
+			CHECK_VK_RESULT(vkEndCommandBuffer(commandBuffers[i]));
 		}
 	}
 
@@ -452,12 +469,15 @@ bool ozz::sample::internal::ContextVulkan::createSemaphores()
 	VkSemaphoreCreateInfo semaphoreInfo = {};
 	semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
 
-	VK_CHECK_RESULT(vkCreateSemaphore(device, &semaphoreInfo, nullptr, imageAvailableSemaphore.replace()));
-	VK_CHECK_RESULT(vkCreateSemaphore(device, &semaphoreInfo, nullptr, renderFinishedSemaphore.replace()));
+	CHECK_VK_RESULT(vkCreateSemaphore(device, &semaphoreInfo, nullptr, imageAvailableSemaphore.replace()));
+	CHECK_VK_RESULT(vkCreateSemaphore(device, &semaphoreInfo, nullptr, renderFinishedSemaphore.replace()));
 	return true;
 }
 
-bool ozz::sample::internal::ContextVulkan::initialize() {
+bool ozz::sample::internal::ContextVulkan::initialize()
+{
+	int32_t width, height;
+	glfwGetFramebufferSize(g_glfwWindow, &width, &height);
 
 	// This will guarantee that each following function will
 	// be called only if every previous one has succeeded.
@@ -466,7 +486,7 @@ bool ozz::sample::internal::ContextVulkan::initialize() {
 		&& createSurface()
 		&& pickPhysicalDevice()
 		&& createLogicalDevice()
-		&& createSwapChain()
+		&& createSwapChain(width, height)
 		&& createSwapChainImageViews()
 		&& createRenderPass()
 		&& createCommandPool()
@@ -545,7 +565,10 @@ bool ozz::sample::internal::ContextVulkan::recreateSwapChain()
 {
 	vkDeviceWaitIdle(device);
 
-	return createSwapChain()
+	int32_t width, height;
+	glfwGetFramebufferSize(g_glfwWindow, &width, &height);
+
+	return createSwapChain(width, height)
 		&& createSwapChainImageViews()
 		&& createRenderPass()
 		&& createDepthResources()
