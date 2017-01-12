@@ -49,6 +49,8 @@ namespace ozz {
 
 			public:
 
+				virtual ~RenderState() { }
+
 				// Gives a chance to create the render resources
 				virtual bool onInitResources(internal::ContextVulkan* context);
 

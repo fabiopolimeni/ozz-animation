@@ -120,15 +120,16 @@ namespace ozz {
 				bool drawFrame();
 				bool recreateSwapChain();
 
+				// T must extend vk::RenderState
 				template<typename T, class... Args>
-				vk::RenderState* createRenderState(Args&&... args);
+				T* createRenderState(Args&&... args);
 				void destroyRenderState(vk::RenderState* renderState);
 			};
 
 			template<typename T, class... Args>
-			vk::RenderState* ozz::sample::internal::ContextVulkan::createRenderState(Args&&... args)
+			T* ozz::sample::internal::ContextVulkan::createRenderState(Args&&... args)
 			{
-				vk::RenderState* renderState = memory::default_allocator()->New<T>(std::forward<Args>(args)...);
+				T* renderState = memory::default_allocator()->New<T>(std::forward<Args>(args)...);
 				if (!registerRenderState(renderState)) {
 					memory::default_allocator()->Delete(renderState);
 					renderState = nullptr;

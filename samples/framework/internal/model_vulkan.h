@@ -58,10 +58,13 @@ namespace ozz {
 					} color;
 				};
 
-				struct UniformBufferObject {
-					ozz::math::Float4x4 model;
-					ozz::math::Float4x4 view;
-					ozz::math::Float4x4 proj;
+				struct ModelBufferObject {
+					std::vector<Vertex>		vertices;	// Vertex buffer
+					std::vector<uint32_t>	indices;	// Index buffer
+				};
+
+				struct InstancesBufferObject {
+					std::vector<ozz::math::Float4x4>	transform;	// instance transformation matrices
 				};
 
 				struct TextureSamplerObject {
@@ -70,26 +73,48 @@ namespace ozz {
 					uint32_t		height;
 				};
 
+				struct UniformBufferObject {
+					ozz::math::Float4x4 model;
+					ozz::math::Float4x4 view;
+					ozz::math::Float4x4 proj;
+				};
+
+				struct InitData {
+					ModelBufferObject		vbo;		// Model buffers (vertices and indices) object
+					InstancesBufferObject	ibo;		// Instances buffer (transformation matrix) object
+					TextureSamplerObject	tso;		// Texture sampler object
+				};
+
 				struct UpdateData {
 					enum UpdateFalgs {
 						UDF_VERTEX_BUFFER = 0x01,
 						UDF_INDEX_BUFFER = 0x02,
-						UDF_UNIFORM_OBJECT = 0x04,
-						UDF_TEXTURE_SAMPLER = 0x08,
-						UDF_ALL = UDF_VERTEX_BUFFER | UDF_INDEX_BUFFER | UDF_UNIFORM_OBJECT | UDF_TEXTURE_SAMPLER
+						UDF_INSTANCE_BUFFER = 0x04,
+						UDF_UNIFORM_BUFFER = 0x08,
+						UDF_TEXTURE_SAMPLER = 0x10,
+						UDF_ALL = UDF_VERTEX_BUFFER
+								| UDF_INDEX_BUFFER
+								| UDF_INSTANCE_BUFFER
+								| UDF_UNIFORM_BUFFER
+								| UDF_TEXTURE_SAMPLER
 					};
 
-					std::vector<Vertex>		vertices;	// Vertex buffer
-					std::vector<uint32_t>	indices;	// Index buffer
-					UniformBufferObject		ubo;		// MVP
-					TextureSamplerObject	tex;		// Texture is meant to be RGBA
-					uint32_t				flags;		// Used to optimize the state changes;
+					ModelBufferObject		vbo;		// Model buffers (vertices and indices) object
+					InstancesBufferObject	ibo;		// Instances buffer (transformation matrix) object
+					TextureSamplerObject	tso;		// Texture sampler object
+					UniformBufferObject		ubo;		// Uniform buffer (MVP) object
+					uint32_t				flags;		// Used to filter state changes;
 				};
 
 			private:
 
-				std::vector<Vertex> vertices;
-				std::vector<uint32_t> indices;
+				// Store the minimum information needed to determine
+				// whether a buffer needs to be re-instantiated or not.
+				uint32_t numOfVertices;
+				uint32_t numOfIndices;
+				uint32_t numOfInstances;
+				uint32_t texWidth;
+				uint32_t texHeight;
 
 				vk::deleter_ptr<VkDescriptorSetLayout> descriptorSetLayout{ renderContext->device, vkDestroyDescriptorSetLayout };
 				vk::deleter_ptr<VkPipelineLayout> pipelineLayout{ renderContext->device, vkDestroyPipelineLayout };
@@ -121,14 +146,18 @@ namespace ozz {
 				void createTextureImage(const uint8_t* pixels, uint32_t width, uint32_t height);
 				void createTextureImageView();
 				void createTextureSampler();
-				void createVertexBuffer(const std::vector<Vertex>& vertex_buffer);
-				void createIndexBuffer(const std::vector<uint32_t>& index_buffer);
+				void createVertexBuffer(const std::vector<Vertex>& vertices);
+				void createIndexBuffer(const std::vector<uint32_t>& indices);
 				void createUniformBuffer();
 				void updateUniformBuffer(const UniformBufferObject& ubo);
 				void createDescriptorPool();
 				void createDescriptorSet();
 
 			public:
+
+				// Ctor
+				ModelRenderState(const InitData& initData);
+				virtual ~ModelRenderState();
 
 				// Gives a chance to create the render resources
 				virtual bool onInitResources(internal::ContextVulkan* context) override;

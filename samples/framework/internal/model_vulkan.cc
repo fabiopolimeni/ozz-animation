@@ -290,9 +290,8 @@ void ozz::sample::vk::ModelRenderState::createTextureSampler() {
 	CHECK_VK_RESULT(vkCreateSampler(renderContext->device, &samplerInfo, nullptr, textureSampler.replace()));
 }
 
-void ozz::sample::vk::ModelRenderState::createVertexBuffer(const std::vector<Vertex>& vertex_buffer) {
+void ozz::sample::vk::ModelRenderState::createVertexBuffer(const std::vector<Vertex>& vertices) {
 	// The index buffer will grow when we'll add a new instance to the render state
-	vertices = vertex_buffer;
 	VkDeviceSize bufferSize = sizeof(vertices[0]) * vertices.size();
 
 	deleter_ptr<VkBuffer> stagingBuffer{ renderContext->device, vkDestroyBuffer };
@@ -318,9 +317,7 @@ void ozz::sample::vk::ModelRenderState::createVertexBuffer(const std::vector<Ver
 	}
 }
 
-void ozz::sample::vk::ModelRenderState::createIndexBuffer(const std::vector<uint32_t>& index_buffer) {
-	// The index buffer will grow when we'll add a new instance to the render state
-	indices = index_buffer;
+void ozz::sample::vk::ModelRenderState::createIndexBuffer(const std::vector<uint32_t>& indices) {
 	VkDeviceSize bufferSize = sizeof(indices[0]) * indices.size();
 
 	deleter_ptr<VkBuffer> stagingBuffer{ renderContext->device, vkDestroyBuffer };
@@ -355,8 +352,7 @@ void ozz::sample::vk::ModelRenderState::createUniformBuffer() {
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, uniformBuffer, uniformBufferMemory);
 }
 
-void ozz::sample::vk::ModelRenderState::updateUniformBuffer(const UniformBufferObject& ubo)
-{
+void ozz::sample::vk::ModelRenderState::updateUniformBuffer(const UniformBufferObject& ubo) {
 	void* data;
 	vkMapMemory(renderContext->device, uniformStagingBufferMemory, 0, sizeof(ubo), 0, &data);
 	{
@@ -428,9 +424,24 @@ void ozz::sample::vk::ModelRenderState::createDescriptorSet() {
 	vkUpdateDescriptorSets(renderContext->device, static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
 }
 
+ozz::sample::vk::ModelRenderState::ModelRenderState(const InitData& /*initData*/)
+	: numOfVertices(0), numOfIndices(0), numOfInstances(0)
+	, texWidth(0), texHeight(0)
+{
+
+}
+
+ozz::sample::vk::ModelRenderState::~ModelRenderState()
+{
+
+}
+
 bool ozz::sample::vk::ModelRenderState::onInitResources(internal::ContextVulkan* context) {
 	if (RenderState::onInitResources(context)) {
-
+		createDescriptorSetLayout();
+		createGraphicsPipeline();
+		createUniformBuffer();
+		createDescriptorPool();
 	}
 
 	return false;
@@ -445,5 +456,6 @@ bool ozz::sample::vk::ModelRenderState::onRegisterRenderPass() {
 }
 
 bool ozz::sample::vk::ModelRenderState::update(const UpdateData& /*updateData*/) {
+
 	return true;
 }

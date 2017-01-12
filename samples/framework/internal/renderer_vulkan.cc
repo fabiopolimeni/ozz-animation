@@ -56,14 +56,6 @@ ozz::sample::internal::RendererVulkan::~RendererVulkan()
 bool ozz::sample::internal::RendererVulkan::Initialize()
 {
 	log::Log() << "Render engine: Vulkan" << std::endl;
-
-	// Initialise to default values the render state infos
-	for (auto rsiIt = 0; rsiIt < RenderStateType::RST_MAX; ++rsiIt) {
-		auto& rsi = stateInfos_[rsiIt];
-		rsi.stateType = (RenderStateType)rsiIt;
-		rsi.numOfInstances = 0;
-	}
-
 	context_ = memory::default_allocator()->New<internal::ContextVulkan>();
 	return context_->initialize();
 }
@@ -98,31 +90,30 @@ bool ozz::sample::internal::RendererVulkan::DrawBoxIm(const ozz::math::Box & _bo
 
 bool ozz::sample::internal::RendererVulkan::DrawBoxShaded(const ozz::math::Box & _box, ozz::Range<const ozz::math::Float4x4> _transforms, Color _color)
 {
-	for (auto mIt = 0; mIt < _transforms.Count(); ++mIt) {
-		RenderStateInfo& state_info = stateInfos_[RenderStateType::RST_MODEL];
-		if (state_info.numOfInstances >= state_info.stateInstances.size()) {
-			auto* stateInstance = context_->createRenderState<vk::ModelRenderState>();
-			state_info.stateInstances.push_back(stateInstance);
-		}
+	// If a shaded box render state doesn't exist yet, create one
+	if (!rs_shaded_boxes_) {
 
-		auto* model_render_state = static_cast<vk::ModelRenderState*>(state_info.stateInstances[state_info.numOfInstances++]);
-
-		vk::ModelRenderState::UpdateData update_data;
+		// Create a new model-render-state template
+		vk::ModelRenderState::InitData init_data;
 
 		// front-face
 		{
 			std::vector<vk::ModelRenderState::Vertex> front_face = {
 				//				position							normal								uvs										color
-				{ ozz::math::Float3(-0.5f, -0.5f, 0.5f), ozz::math::Float3(0.0f, 0.0f, 1.0f), ozz::math::Float2(0.0f, 0.0f), { _color.r, _color.g, _color.b, _color.a} },
-				{ ozz::math::Float3(0.5f, -0.5f, 0.5f),  ozz::math::Float3(0.0f, 0.0f, 1.0f), ozz::math::Float2(1.0f, 0.0f), { _color.r, _color.g, _color.b, _color.a } },
-				{ ozz::math::Float3(0.5f,  0.5f, 0.5f),  ozz::math::Float3(0.0f, 0.0f, 1.0f), ozz::math::Float2(1.0f, 1.0f), { _color.r, _color.g, _color.b, _color.a } },
-				{ ozz::math::Float3(-0.5f,  0.5f, 0.5f), ozz::math::Float3(0.0f, 0.0f, 1.0f), ozz::math::Float2(0.0f, 1.0f), { _color.r, _color.g, _color.b, _color.a } }
+				{ ozz::math::Float3(-0.5f, -0.5f, 0.5f), ozz::math::Float3(0.0f, 0.0f, 1.0f), ozz::math::Float2(0.0f, 0.0f),{ _color.r, _color.g, _color.b, _color.a } },
+				{ ozz::math::Float3(0.5f, -0.5f, 0.5f),  ozz::math::Float3(0.0f, 0.0f, 1.0f), ozz::math::Float2(1.0f, 0.0f),{ _color.r, _color.g, _color.b, _color.a } },
+				{ ozz::math::Float3(0.5f,  0.5f, 0.5f),  ozz::math::Float3(0.0f, 0.0f, 1.0f), ozz::math::Float2(1.0f, 1.0f),{ _color.r, _color.g, _color.b, _color.a } },
+				{ ozz::math::Float3(-0.5f,  0.5f, 0.5f), ozz::math::Float3(0.0f, 0.0f, 1.0f), ozz::math::Float2(0.0f, 1.0f),{ _color.r, _color.g, _color.b, _color.a } }
 			};
 
-			uint32_t start_index = static_cast<uint32_t>(update_data.vertices.size());
-			update_data.indices.insert(std::begin(update_data.indices), {
+			uint32_t start_index = static_cast<uint32_t>(init_data.vbo.vertices.size());
+
+			// triangle face
+			init_data.vbo.indices.insert(std::begin(init_data.vbo.indices), {
 				start_index + 0, start_index + 1, start_index + 2, start_index + 2, start_index + 3, start_index + 0 });
-			update_data.vertices.insert(std::begin(update_data.vertices), std::begin(front_face), std::begin(front_face));
+
+			// vertices
+			init_data.vbo.vertices.insert(std::begin(init_data.vbo.vertices), std::begin(front_face), std::begin(front_face));
 		}
 
 		// TODO: ...
@@ -132,13 +123,30 @@ bool ozz::sample::internal::RendererVulkan::DrawBoxShaded(const ozz::math::Box &
 		// right-face
 		// left-face
 
+		rs_shaded_boxes_ = context_->createRenderState<vk::ModelRenderState>(init_data);
+		CHECK_AND_REPORT(rs_shaded_boxes_, "Shaded boxes render state can't be created!");
+	}
+
+	// Update uniform buffer
+	for (auto mIt = 0; mIt < _transforms.Count(); ++mIt) {
+		// _transforms[mIt];
+	}
+
+	// Update instances buffer
+	{
+		vk::ModelRenderState::UpdateData update_data;
+
 		// Uniform data
-		update_data.ubo.model = _transforms[mIt];
+		update_data.ubo.model = math::Float4x4::identity();
 		update_data.ubo.view = camera_->view();
 		update_data.ubo.proj = camera_->projection();
 
-		model_render_state->update(update_data);
+		// Update the uniform buffer
+		update_data.flags = vk::ModelRenderState::UpdateData::UDF_UNIFORM_BUFFER;
+
+		rs_shaded_boxes_->update(update_data);
 	}
+
 	return true;
 }
 
@@ -164,11 +172,6 @@ bool ozz::sample::internal::RendererVulkan::DrawBinormals(ozz::Range<const float
 
 bool ozz::sample::internal::RendererVulkan::RenderFrame()
 {
-	// Reset numOfInstance of each render state.
-	for (auto& rsi : stateInfos_) {
-		rsi.numOfInstances = 0;
-	}
-
 	return context_->drawFrame();
 }
 
