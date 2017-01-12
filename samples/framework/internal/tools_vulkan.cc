@@ -307,7 +307,7 @@ namespace ozz {
 				return true;
 			}
 
-			void createShaderModule(VkDevice device, const std::vector<char>& code, ozz::sample::vk::deleter_ptr<VkShaderModule>& shaderModule) {
+			void createShaderModule(VkDevice device, const std::vector<char>& code, deleter_ptr<VkShaderModule>& shaderModule) {
 				VkShaderModuleCreateInfo createInfo = {};
 				createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
 				createInfo.codeSize = code.size();
@@ -368,7 +368,7 @@ namespace ozz {
 			}
 
 			void createImageView(VkDevice device, VkImage image, VkFormat format, VkImageAspectFlags aspectFlags,
-				ozz::sample::vk::deleter_ptr<VkImageView>& imageView) {
+				deleter_ptr<VkImageView>& imageView) {
 				VkImageViewCreateInfo viewInfo = {};
 				viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
 				viewInfo.image = image;
@@ -521,17 +521,69 @@ namespace ozz {
 				CHECK_VK_RESULT(vkBindBufferMemory(device, buffer, bufferMemory, 0));
 			}
 
+			void createBuffer(VkPhysicalDevice physicalDevice, VkDevice device, VkDeviceSize size, VkBufferUsageFlags usage,
+				VkMemoryPropertyFlags properties, VkBuffer& buffer, VkDeviceMemory& bufferMemory) {
+				VkBufferCreateInfo bufferInfo = {};
+				bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+				bufferInfo.size = size;
+				bufferInfo.usage = usage;
+				bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+				CHECK_VK_RESULT(vkCreateBuffer(device, &bufferInfo, nullptr, &buffer));
+
+				VkMemoryRequirements memRequirements;
+				vkGetBufferMemoryRequirements(device, buffer, &memRequirements);
+
+				VkMemoryAllocateInfo allocInfo = {};
+				allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+				allocInfo.allocationSize = memRequirements.size;
+
+				findMemoryType(physicalDevice, memRequirements.memoryTypeBits, properties, allocInfo.memoryTypeIndex);
+
+				CHECK_VK_RESULT(vkAllocateMemory(device, &allocInfo, nullptr, &bufferMemory));
+				CHECK_VK_RESULT(vkBindBufferMemory(device, buffer, bufferMemory, 0));
+			}
+
 			void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size, VkCommandBuffer commandBuffer) {
 				VkBufferCopy copyRegion = {};
 				copyRegion.size = size;
 				vkCmdCopyBuffer(commandBuffer, srcBuffer, dstBuffer, 1, &copyRegion);
 			}
 
+			void updateBuffer(VkPhysicalDevice physicalDevice, VkDevice device, VkBuffer destBuffer, VkQueue queue, VkCommandPool commandPool, const uint8_t* bufData, size_t bufSize) {
+				VkDeviceSize bufferSize = bufSize;
+				
+				VkBuffer stagingBuffer;
+				VkDeviceMemory stagingBufferMemory;
+				createBuffer(physicalDevice, device, bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+					VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
+
+				void* data;
+				vkMapMemory(device, stagingBufferMemory, 0, bufferSize, 0, &data);
+				{
+					memcpy(data, bufData, (size_t)bufferSize);
+					vkUnmapMemory(device, stagingBufferMemory);
+				}
+
+				VkCommandBuffer commandBuffer = beginSingleTimeCommand(device, commandPool);
+				{
+					copyBuffer(stagingBuffer, destBuffer, bufferSize, commandBuffer);
+					endSingleTimeCommand(device, queue, commandPool, commandBuffer);
+				}
+
+				vkDestroyBuffer(device, stagingBuffer, nullptr);
+				vkFreeMemory(device, stagingBufferMemory, nullptr);
+			}
+
 			void reportFail(const char* func, VkResult res, const char* file, int32_t line) {
-				ozz::log::Err() << "Vulkan Fatal Error: " << func << " -> "
-					<< ozz::sample::vk::getErrorString(res)
-					<< " (file: " << file << " at line: " << line << ")" << std::endl;
-				assert(res == VK_SUCCESS);
+				ozz::log::Err() << "Fatal Error: " << func;
+
+				if (res != VK_SUCCESS) {
+					ozz::log::Err()  << " -> " << ozz::sample::vk::getErrorString(res);
+				}
+
+				ozz::log::Err() << " (file: " << file << " at line: " << line << ")" << std::endl;
+				assert(false);
 				std::exit(EXIT_FAILURE);
 			}
 

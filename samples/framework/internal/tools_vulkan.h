@@ -176,6 +176,14 @@ namespace ozz {
 				deleter_ptr<VkBuffer>& buffer, deleter_ptr<VkDeviceMemory>& bufferMemory);
 
 			void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size, VkCommandBuffer commandBuffer);
+			
+			void createBuffer(VkPhysicalDevice physicalDevice, VkDevice device,
+				VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties,
+				VkBuffer& buffer, VkDeviceMemory& bufferMemory);
+
+			void updateBuffer(VkPhysicalDevice physicalDevice, VkDevice device,
+				VkBuffer destBuffer, VkQueue queue, VkCommandPool commandPool,
+				const uint8_t* bufferData, size_t bufferSize);
 
 			void reportFail(const char* funcCall, VkResult result, const char* file, int32_t line);
 
@@ -184,7 +192,7 @@ namespace ozz {
 } // namespace ozz
 
 // Macro to check invalid statement
-#define CHECK_AND_REPORT(cond, msg) if (!cond) ozz::sample::vk::reportFail(msg, VK_SUCCESS, __FILE__, __LINE__)
+#define CHECK_AND_REPORT(cond, msg) if (!(cond)) ozz::sample::vk::reportFail(msg, VK_SUCCESS, __FILE__, __LINE__)
 
 // Macro to check Vulkan return results. We can do the follow because VK_SUCCESS == 0
 #define CHECK_VK_RESULT(func) if (VkResult res = (func)) ozz::sample::vk::reportFail(#func, res, __FILE__, __LINE__)

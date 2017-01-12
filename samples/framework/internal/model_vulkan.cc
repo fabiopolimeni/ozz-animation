@@ -94,7 +94,7 @@ void ozz::sample::vk::ModelRenderState::createGraphicsPipeline() {
 	std::vector<char> fragShaderCode;
 	bool validShaders = vk::readFile("../shaders/vert.spv", vertShaderCode) && vk::readFile("../shaders/frag.spv", fragShaderCode);
 
-	CHECK_AND_REPORT(validShaders, "Failed to load shader code. The graphics pipeline cannot be created!");
+	CHECK_AND_REPORT(validShaders, "Failed to load shader code. The graphics pipeline cannot be created");
 
 	deleter_ptr<VkShaderModule> vertShaderModule{ renderContext->device, vkDestroyShaderModule };
 	deleter_ptr<VkShaderModule> fragShaderModule{ renderContext->device, vkDestroyShaderModule };
@@ -213,62 +213,28 @@ void ozz::sample::vk::ModelRenderState::createGraphicsPipeline() {
 	pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
 
 	CHECK_VK_RESULT(vkCreateGraphicsPipelines(renderContext->device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, graphicsPipeline.replace()));
+	dirty = true;
 }
 
 void ozz::sample::vk::ModelRenderState::createTextureImage(const uint8_t* pixels, uint32_t width, uint32_t height) {
-	deleter_ptr<VkImage> stagingImage{ renderContext->device, vkDestroyImage };
-	deleter_ptr<VkDeviceMemory> stagingImageMemory{ renderContext->device, vkFreeMemory };
-	createImage(renderContext->physicalDevice, renderContext->device, width, height,
-		VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TILING_LINEAR, VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
-		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-		stagingImage, stagingImageMemory);
-
-	VkImageSubresource subresource = {};
-	subresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-	subresource.mipLevel = 0;
-	subresource.arrayLayer = 0;
-
-	VkSubresourceLayout stagingImageLayout;
-	vkGetImageSubresourceLayout(renderContext->device, stagingImage, &subresource, &stagingImageLayout);
-
-	void* data;
-	VkDeviceSize imageSize = width * height * 4;
-
-	vkMapMemory(renderContext->device, stagingImageMemory, 0, imageSize, 0, &data);
-	{
-		if (stagingImageLayout.rowPitch == width * 4) {
-			memcpy(data, pixels, (size_t)imageSize);
-		}
-		else {
-			uint8_t* dataBytes = reinterpret_cast<uint8_t*>(data);
-
-			for (uint32_t y = 0; y < height; y++) {
-				memcpy(&dataBytes[y * stagingImageLayout.rowPitch], &pixels[y * width * 4], width * 4);
-			}
-		}
-
-		vkUnmapMemory(renderContext->device, stagingImageMemory);
-	}
+	// Store the texture's width and height, that is,
+	// we can decide later whether the buffer requires
+	// to be re-created when and update is requested.
+	texWidth = width;
+	texHeight = height;
 
 	createImage(renderContext->physicalDevice, renderContext->device, width, height,
 		VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TILING_OPTIMAL,
 		VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, textureImage, textureImageMemory);
 
-	VkCommandBuffer commandBuffer = beginSingleTimeCommand(renderContext->device, renderContext->commandPool);
-	{
-		transitionImageLayout(stagingImage, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_LAYOUT_PREINITIALIZED, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, commandBuffer);
-		transitionImageLayout(textureImage, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_LAYOUT_PREINITIALIZED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, commandBuffer);
-		copyImage(stagingImage, textureImage, width, height, commandBuffer);
-
-		transitionImageLayout(textureImage, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, commandBuffer);
-
-		endSingleTimeCommand(renderContext->device, renderContext->graphicsQueue, renderContext->commandPool, commandBuffer);
-	}
+	updateTextureImage(pixels, width, height);
+	dirty = true;
 }
 
 void ozz::sample::vk::ModelRenderState::createTextureImageView() {
 	createImageView(renderContext->device, textureImage, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT, textureImageView);
+	dirty = true;
 }
 
 void ozz::sample::vk::ModelRenderState::createTextureSampler() {
@@ -288,59 +254,42 @@ void ozz::sample::vk::ModelRenderState::createTextureSampler() {
 	samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
 
 	CHECK_VK_RESULT(vkCreateSampler(renderContext->device, &samplerInfo, nullptr, textureSampler.replace()));
+	dirty = true;
 }
 
 void ozz::sample::vk::ModelRenderState::createVertexBuffer(const std::vector<Vertex>& vertices) {
-	// The index buffer will grow when we'll add a new instance to the render state
 	VkDeviceSize bufferSize = sizeof(vertices[0]) * vertices.size();
 
-	deleter_ptr<VkBuffer> stagingBuffer{ renderContext->device, vkDestroyBuffer };
-	deleter_ptr<VkDeviceMemory> stagingBufferMemory{ renderContext->device, vkFreeMemory };
-	createBuffer(renderContext->physicalDevice, renderContext->device, bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
-
-	void* data;
-	vkMapMemory(renderContext->device, stagingBufferMemory, 0, bufferSize, 0, &data);
-	{
-		memcpy(data, vertices.data(), (size_t)bufferSize);
-		vkUnmapMemory(renderContext->device, stagingBufferMemory);
-	}
-
+	// Store the number of vertices, that is, we can decide
+	// later whether or not a buffer update requires to
+	// re-create the vertex-buffer.
+	numOfVertices = static_cast<uint32_t>(vertices.size());
 	createBuffer(renderContext->physicalDevice, renderContext->device, bufferSize,
 		VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, vertexBuffer, vertexBufferMemory);
-
-	VkCommandBuffer commandBuffer = beginSingleTimeCommand(renderContext->device, renderContext->commandPool);
-	{
-		copyBuffer(stagingBuffer, vertexBuffer, bufferSize, commandBuffer);
-		endSingleTimeCommand(renderContext->device, renderContext->graphicsQueue, renderContext->commandPool, commandBuffer);
-	}
+	
+	updateVertexBuffer(vertices);	
+	dirty = true;
 }
 
 void ozz::sample::vk::ModelRenderState::createIndexBuffer(const std::vector<uint32_t>& indices) {
 	VkDeviceSize bufferSize = sizeof(indices[0]) * indices.size();
 
-	deleter_ptr<VkBuffer> stagingBuffer{ renderContext->device, vkDestroyBuffer };
-	deleter_ptr<VkDeviceMemory> stagingBufferMemory{ renderContext->device, vkFreeMemory };
-	createBuffer(renderContext->physicalDevice, renderContext->device, bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
-
-	void* data;
-	vkMapMemory(renderContext->device, stagingBufferMemory, 0, bufferSize, 0, &data);
-	{
-		memcpy(data, indices.data(), (size_t)bufferSize);
-		vkUnmapMemory(renderContext->device, stagingBufferMemory);
-	}
-
+	// Store the number of indices, that is, we can decide
+	// later whether or not a buffer update requires to
+	// re-create the index-buffer.
+	numOfIndices = static_cast<uint32_t>(indices.size());
 	createBuffer(renderContext->physicalDevice, renderContext->device, bufferSize,
 		VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, indexBuffer, indexBufferMemory);
-	
-	VkCommandBuffer commandBuffer = beginSingleTimeCommand(renderContext->device, renderContext->commandPool);
-	{
-		copyBuffer(stagingBuffer, indexBuffer, bufferSize, commandBuffer);
-		endSingleTimeCommand(renderContext->device, renderContext->graphicsQueue, renderContext->commandPool, commandBuffer);
-	}
+
+	updateIndexBuffer(indices);
+	dirty = true;
+}
+
+void ozz::sample::vk::ModelRenderState::createInstanceBuffer(
+	const std::vector<ozz::math::Float4x4>& /*transforms*/) {
+	// TODO: ...
 }
 
 void ozz::sample::vk::ModelRenderState::createUniformBuffer() {
@@ -350,21 +299,7 @@ void ozz::sample::vk::ModelRenderState::createUniformBuffer() {
 		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, uniformStagingBuffer, uniformStagingBufferMemory);
 	createBuffer(renderContext->physicalDevice, renderContext->device, bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, uniformBuffer, uniformBufferMemory);
-}
-
-void ozz::sample::vk::ModelRenderState::updateUniformBuffer(const UniformBufferObject& ubo) {
-	void* data;
-	vkMapMemory(renderContext->device, uniformStagingBufferMemory, 0, sizeof(ubo), 0, &data);
-	{
-		memcpy(data, &ubo, sizeof(ubo));
-		vkUnmapMemory(renderContext->device, uniformStagingBufferMemory);
-	}
-
-	VkCommandBuffer commandBuffer = beginSingleTimeCommand(renderContext->device, renderContext->commandPool);
-	{
-		copyBuffer(uniformStagingBuffer, uniformBuffer, sizeof(ubo), commandBuffer);
-		endSingleTimeCommand(renderContext->device, renderContext->graphicsQueue, renderContext->commandPool, commandBuffer);
-	}
+	dirty = true;
 }
 
 void ozz::sample::vk::ModelRenderState::createDescriptorPool() {
@@ -422,17 +357,188 @@ void ozz::sample::vk::ModelRenderState::createDescriptorSet() {
 	descriptorWrites[1].pImageInfo = &imageInfo;
 
 	vkUpdateDescriptorSets(renderContext->device, static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
+	dirty = true;
 }
 
-ozz::sample::vk::ModelRenderState::ModelRenderState(const InitData& /*initData*/)
+void ozz::sample::vk::ModelRenderState::updateVertexBuffer(const std::vector<Vertex>& vertices) {
+	CHECK_AND_REPORT(vertexBuffer && vertexBufferMemory, "vertexBuffer and vertexBufferMemory have to be valid handles");
+	CHECK_AND_REPORT(vertices.size() == numOfVertices, "To update the vertex buffer, the number of vertices have to match");
+
+	VkDeviceSize bufferSize = sizeof(vertices[0]) * vertices.size();
+	deleter_ptr<VkBuffer> stagingBuffer{ renderContext->device, vkDestroyBuffer };
+	deleter_ptr<VkDeviceMemory> stagingBufferMemory{ renderContext->device, vkFreeMemory };
+	createBuffer(renderContext->physicalDevice, renderContext->device, bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
+
+	void* data;
+	vkMapMemory(renderContext->device, stagingBufferMemory, 0, bufferSize, 0, &data);
+	{
+		memcpy(data, vertices.data(), (size_t)bufferSize);
+		vkUnmapMemory(renderContext->device, stagingBufferMemory);
+	}
+
+	VkCommandBuffer commandBuffer = beginSingleTimeCommand(renderContext->device, renderContext->commandPool);
+	{
+		copyBuffer(stagingBuffer, vertexBuffer, bufferSize, commandBuffer);
+		endSingleTimeCommand(renderContext->device, renderContext->graphicsQueue, renderContext->commandPool, commandBuffer);
+	}
+}
+
+void ozz::sample::vk::ModelRenderState::updateIndexBuffer(const std::vector<uint32_t>& indices) {
+	CHECK_AND_REPORT(indexBuffer && indexBufferMemory, "indexBuffer and indexBufferMemory have to be valid handles");
+	CHECK_AND_REPORT(indices.size() == numOfIndices, "To update the index buffer, the number of indices have to match");
+	
+	VkDeviceSize bufferSize = sizeof(indices[0]) * indices.size();
+	deleter_ptr<VkBuffer> stagingBuffer{ renderContext->device, vkDestroyBuffer };
+	deleter_ptr<VkDeviceMemory> stagingBufferMemory{ renderContext->device, vkFreeMemory };
+	createBuffer(renderContext->physicalDevice, renderContext->device, bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
+
+	void* data;
+	vkMapMemory(renderContext->device, stagingBufferMemory, 0, bufferSize, 0, &data);
+	{
+		memcpy(data, indices.data(), (size_t)bufferSize);
+		vkUnmapMemory(renderContext->device, stagingBufferMemory);
+	}
+
+	VkCommandBuffer commandBuffer = beginSingleTimeCommand(renderContext->device, renderContext->commandPool);
+	{
+		copyBuffer(stagingBuffer, indexBuffer, bufferSize, commandBuffer);
+		endSingleTimeCommand(renderContext->device, renderContext->graphicsQueue, renderContext->commandPool, commandBuffer);
+	}
+}
+
+void ozz::sample::vk::ModelRenderState::updateInstanceBuffer(
+	const std::vector<ozz::math::Float4x4>& /*transforms*/) {
+	// TODO: ...
+}
+void ozz::sample::vk::ModelRenderState::updateTextureImage(const uint8_t* pixels, uint32_t width, uint32_t height) {
+	CHECK_AND_REPORT(pixels, "Texture's pixels need to point to valid memory");
+	CHECK_AND_REPORT(texWidth == width && texHeight == height, "To update texture image data, texture dimensions have to match");
+	
+	deleter_ptr<VkImage> stagingImage{ renderContext->device, vkDestroyImage };
+	deleter_ptr<VkDeviceMemory> stagingImageMemory{ renderContext->device, vkFreeMemory };
+	createImage(renderContext->physicalDevice, renderContext->device, width, height,
+		VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TILING_LINEAR, VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
+		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+		stagingImage, stagingImageMemory);
+
+	VkImageSubresource subresource = {};
+	subresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	subresource.mipLevel = 0;
+	subresource.arrayLayer = 0;
+
+	VkSubresourceLayout stagingImageLayout;
+	vkGetImageSubresourceLayout(renderContext->device, stagingImage, &subresource, &stagingImageLayout);
+
+	void* data;
+	VkDeviceSize imageSize = width * height * 4;
+	vkMapMemory(renderContext->device, stagingImageMemory, 0, imageSize, 0, &data);
+	{
+		if (stagingImageLayout.rowPitch == width * 4) {
+			memcpy(data, pixels, (size_t)imageSize);
+		}
+		else {
+			uint8_t* dataBytes = reinterpret_cast<uint8_t*>(data);
+
+			for (uint32_t y = 0; y < height; y++) {
+				memcpy(&dataBytes[y * stagingImageLayout.rowPitch], &pixels[y * width * 4], width * 4);
+			}
+		}
+
+		vkUnmapMemory(renderContext->device, stagingImageMemory);
+	}
+
+	VkCommandBuffer commandBuffer = beginSingleTimeCommand(renderContext->device, renderContext->commandPool);
+	{
+		transitionImageLayout(stagingImage, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_LAYOUT_PREINITIALIZED, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, commandBuffer);
+		transitionImageLayout(textureImage, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_LAYOUT_PREINITIALIZED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, commandBuffer);
+		copyImage(stagingImage, textureImage, width, height, commandBuffer);
+
+		transitionImageLayout(textureImage, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, commandBuffer);
+
+		endSingleTimeCommand(renderContext->device, renderContext->graphicsQueue, renderContext->commandPool, commandBuffer);
+	}
+}
+
+bool ozz::sample::vk::ModelRenderState::updateGeometryBufferObject(const GeometryBuffersObject& gbo) {
+	bool b_recreate = false;
+
+	CHECK_AND_REPORT(gbo.vertices.size(), "Vertex buffer needs to contain valid data");
+	if (gbo.vertices.size() != numOfVertices) {
+		createVertexBuffer(gbo.vertices);
+		b_recreate = true;
+	}
+	else {
+		updateVertexBuffer(gbo.vertices);
+	}
+
+	CHECK_AND_REPORT(gbo.indices.size(), "Index buffer needs to contain valid data");
+	if (gbo.indices.size() != numOfIndices) {
+		createIndexBuffer(gbo.indices);
+		b_recreate = true;
+	}
+	else {
+		updateIndexBuffer(gbo.indices);
+	}
+
+	return b_recreate;
+}
+
+bool ozz::sample::vk::ModelRenderState::updateInstanceBufferObject(const InstancesBufferObject& ibo) {
+	CHECK_AND_REPORT(ibo.transforms.size(), "Vertex buffer needs to contain valid data");
+	if (ibo.transforms.size() != numOfInstances) {
+		createInstanceBuffer(ibo.transforms);
+		return true;
+	}
+	else {
+		updateInstanceBuffer(ibo.transforms);
+		return false;
+	}
+}
+
+bool ozz::sample::vk::ModelRenderState::updateTextureImageBufferObject(const TextureSamplerObject& tso) {
+	CHECK_AND_REPORT(tso.pixels, "Texture image object needs to point to valid data");
+	CHECK_AND_REPORT(tso.width, "Texture image width can't be 0");
+	CHECK_AND_REPORT(tso.height, "Texture image height can't be 0");
+
+	if ((texWidth != tso.width) || (texHeight != tso.height)) {
+		createTextureImage(tso.pixels, tso.width, tso.height);
+		createTextureImageView();
+		createTextureSampler();
+		return true;
+	}
+	else {
+		updateTextureImage(tso.pixels, tso.width, tso.height);
+		return false;
+	}
+}
+
+bool ozz::sample::vk::ModelRenderState::updateUniformBufferObject(const UniformBufferObject& ubo) {
+	void* data;
+	vkMapMemory(renderContext->device, uniformStagingBufferMemory, 0, sizeof(ubo), 0, &data);
+	{
+		memcpy(data, &ubo, sizeof(ubo));
+		vkUnmapMemory(renderContext->device, uniformStagingBufferMemory);
+	}
+
+	VkCommandBuffer commandBuffer = beginSingleTimeCommand(renderContext->device, renderContext->commandPool);
+	{
+		copyBuffer(uniformStagingBuffer, uniformBuffer, sizeof(ubo), commandBuffer);
+		endSingleTimeCommand(renderContext->device, renderContext->graphicsQueue, renderContext->commandPool, commandBuffer);
+	}
+
+	// NOTE: Can't change the uniform buffer size at runtime
+	return false;
+}
+
+ozz::sample::vk::ModelRenderState::ModelRenderState()
 	: numOfVertices(0), numOfIndices(0), numOfInstances(0)
-	, texWidth(0), texHeight(0)
-{
+	, texWidth(0), texHeight(0), dirty(false) {
 
 }
 
-ozz::sample::vk::ModelRenderState::~ModelRenderState()
-{
+ozz::sample::vk::ModelRenderState::~ModelRenderState() {
 
 }
 
@@ -442,6 +548,7 @@ bool ozz::sample::vk::ModelRenderState::onInitResources(internal::ContextVulkan*
 		createGraphicsPipeline();
 		createUniformBuffer();
 		createDescriptorPool();
+		return true;
 	}
 
 	return false;
@@ -451,11 +558,78 @@ void ozz::sample::vk::ModelRenderState::onReleaseResources() {
 	RenderState::onReleaseResources();
 }
 
-bool ozz::sample::vk::ModelRenderState::onRegisterRenderPass() {
+bool ozz::sample::vk::ModelRenderState::onRegisterRenderPass(size_t commandIndex) {	
+	VkCommandBuffer commandBuffer = renderContext->commandBuffers[commandIndex];
+
+	vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
+
+	VkBuffer vertexBuffers[] = { vertexBuffer };
+	VkDeviceSize offsets[] = { 0 };
+	vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
+
+	vkCmdBindIndexBuffer(commandBuffer, indexBuffer, 0, VK_INDEX_TYPE_UINT32);
+
+	vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSet, 0, nullptr);
+
+	vkCmdDrawIndexed(commandBuffer, numOfIndices, 1, 0, 0, 0);
+
+	dirty = false;
 	return true;
 }
 
-bool ozz::sample::vk::ModelRenderState::update(const UpdateData& /*updateData*/) {
+bool ozz::sample::vk::ModelRenderState::onSwapChainResize() {
+	createGraphicsPipeline();
+	return true;
+}
+
+bool ozz::sample::vk::ModelRenderState::isDirty() {
+	return dirty;
+}
+
+bool ozz::sample::vk::ModelRenderState::init(const InitData& initData) {
+	// Geometry
+	createVertexBuffer(initData.gbo.vertices);
+	createIndexBuffer(initData.gbo.indices);
+
+	// Texture
+	createTextureImage(initData.tso.pixels, initData.tso.width, initData.tso.height);
+	createTextureImageView();
+	createTextureSampler();
+
+	// The descriptor set depends on the above buffers
+	createDescriptorSet();
+
+	return true;
+}
+
+// Filter what to update based on the set flags
+bool ozz::sample::vk::ModelRenderState::update(const UpdateData& updateData) {
+	bool b_input_assambly_modified = false;
+	bool b_recreate_descriptor_set = false;
+	
+	// Geometry buffers
+	if (updateData.flags & (UpdateData::UDF_VERTEX_BUFFER | UpdateData::UDF_INDEX_BUFFER)) {
+		b_input_assambly_modified |= updateGeometryBufferObject(updateData.gbo);
+	}
+
+	// Instances buffer
+	if (updateData.flags & (UpdateData::UDF_INSTANCE_BUFFER)) {
+		b_input_assambly_modified |= updateInstanceBufferObject(updateData.ibo);
+	}
+
+	// Texture buffer
+	if (updateData.flags & (UpdateData::UDF_TEXTURE_IMAGE_BUFFER)) {
+		b_recreate_descriptor_set |= updateTextureImageBufferObject(updateData.tso);
+	}
+
+	// Uniform buffer
+	if (updateData.flags & (UpdateData::UDF_UNIFORM_BUFFER)) {
+		b_recreate_descriptor_set |= updateUniformBufferObject(updateData.ubo);
+	}
+
+	if (b_recreate_descriptor_set) {
+		createDescriptorSet();
+	}
 
 	return true;
 }

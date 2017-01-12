@@ -44,6 +44,7 @@
 
 ozz::sample::internal::RendererVulkan::RendererVulkan(Camera * _camera)
 	: ozz::sample::Renderer(), camera_(_camera)
+	, rs_shaded_boxes_(nullptr)
 {
 }
 
@@ -92,7 +93,6 @@ bool ozz::sample::internal::RendererVulkan::DrawBoxShaded(const ozz::math::Box &
 {
 	// If a shaded box render state doesn't exist yet, create one
 	if (!rs_shaded_boxes_) {
-
 		// Create a new model-render-state template
 		vk::ModelRenderState::InitData init_data;
 
@@ -100,20 +100,20 @@ bool ozz::sample::internal::RendererVulkan::DrawBoxShaded(const ozz::math::Box &
 		{
 			std::vector<vk::ModelRenderState::Vertex> front_face = {
 				//				position							normal								uvs										color
-				{ ozz::math::Float3(-0.5f, -0.5f, 0.5f), ozz::math::Float3(0.0f, 0.0f, 1.0f), ozz::math::Float2(0.0f, 0.0f),{ _color.r, _color.g, _color.b, _color.a } },
-				{ ozz::math::Float3(0.5f, -0.5f, 0.5f),  ozz::math::Float3(0.0f, 0.0f, 1.0f), ozz::math::Float2(1.0f, 0.0f),{ _color.r, _color.g, _color.b, _color.a } },
-				{ ozz::math::Float3(0.5f,  0.5f, 0.5f),  ozz::math::Float3(0.0f, 0.0f, 1.0f), ozz::math::Float2(1.0f, 1.0f),{ _color.r, _color.g, _color.b, _color.a } },
-				{ ozz::math::Float3(-0.5f,  0.5f, 0.5f), ozz::math::Float3(0.0f, 0.0f, 1.0f), ozz::math::Float2(0.0f, 1.0f),{ _color.r, _color.g, _color.b, _color.a } }
+				{ ozz::math::Float3(-0.5f, -0.5f, 0.5f), ozz::math::Float3(0.0f, 0.0f, 1.0f), ozz::math::Float2(0.0f, 0.0f), { _color.r, _color.g, _color.b, _color.a } },
+				{ ozz::math::Float3(0.5f, -0.5f, 0.5f),  ozz::math::Float3(0.0f, 0.0f, 1.0f), ozz::math::Float2(1.0f, 0.0f), { _color.r, _color.g, _color.b, _color.a } },
+				{ ozz::math::Float3(0.5f,  0.5f, 0.5f),  ozz::math::Float3(0.0f, 0.0f, 1.0f), ozz::math::Float2(1.0f, 1.0f), { _color.r, _color.g, _color.b, _color.a } },
+				{ ozz::math::Float3(-0.5f,  0.5f, 0.5f), ozz::math::Float3(0.0f, 0.0f, 1.0f), ozz::math::Float2(0.0f, 1.0f), { _color.r, _color.g, _color.b, _color.a } }
 			};
 
-			uint32_t start_index = static_cast<uint32_t>(init_data.vbo.vertices.size());
+			const uint32_t start_index = static_cast<uint32_t>(init_data.gbo.vertices.size());
 
 			// triangle face
-			init_data.vbo.indices.insert(std::begin(init_data.vbo.indices), {
+			init_data.gbo.indices.insert(std::begin(init_data.gbo.indices), {
 				start_index + 0, start_index + 1, start_index + 2, start_index + 2, start_index + 3, start_index + 0 });
 
 			// vertices
-			init_data.vbo.vertices.insert(std::begin(init_data.vbo.vertices), std::begin(front_face), std::begin(front_face));
+			init_data.gbo.vertices.insert(std::begin(init_data.gbo.vertices), std::begin(front_face), std::end(front_face));
 		}
 
 		// TODO: ...
@@ -123,19 +123,30 @@ bool ozz::sample::internal::RendererVulkan::DrawBoxShaded(const ozz::math::Box &
 		// right-face
 		// left-face
 
-		rs_shaded_boxes_ = context_->createRenderState<vk::ModelRenderState>(init_data);
-		CHECK_AND_REPORT(rs_shaded_boxes_, "Shaded boxes render state can't be created!");
+		// Static magenta texture
+		static const uint32_t magenta_color = 0xFF00FFFF;
+		init_data.tso.width = 1;
+		init_data.tso.height = 1;
+		init_data.tso.pixels = (const uint8_t*)(&magenta_color);
+
+		rs_shaded_boxes_ = context_->createRenderState<vk::ModelRenderState>();
+		CHECK_AND_REPORT(rs_shaded_boxes_, "Shaded-boxes render-state can't be created!");
+
+		// Create device resources, buffers and texture images
+		CHECK_AND_REPORT(rs_shaded_boxes_->init(init_data), "Cannot initialise the device-resources for the shadeed-boxs render-state!");
+	}
+
+	vk::ModelRenderState::UpdateData update_data;
+
+	// Update instances buffer
+	const auto numOfInstances = _transforms.Count();
+	update_data.ibo.transforms.resize(numOfInstances);
+	for (auto iIt = 0; iIt < numOfInstances; ++iIt) {
+		update_data.ibo.transforms[iIt] = _transforms[iIt];
 	}
 
 	// Update uniform buffer
-	for (auto mIt = 0; mIt < _transforms.Count(); ++mIt) {
-		// _transforms[mIt];
-	}
-
-	// Update instances buffer
 	{
-		vk::ModelRenderState::UpdateData update_data;
-
 		// Uniform data
 		update_data.ubo.model = math::Float4x4::identity();
 		update_data.ubo.view = camera_->view();

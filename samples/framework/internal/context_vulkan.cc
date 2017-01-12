@@ -451,7 +451,7 @@ bool ozz::sample::internal::ContextVulkan::createCommandBuffers()
 				// Iterate through all the render states and
 				// register their binding and drawing operations.
 				for (auto rs : renderStates) {
-					rs->onRegisterRenderPass();
+					rs->onRegisterRenderPass(i);
 				}
 
 				vkCmdEndRenderPass(commandBuffers[i]);
@@ -568,12 +568,21 @@ bool ozz::sample::internal::ContextVulkan::recreateSwapChain()
 	int32_t width, height;
 	glfwGetFramebufferSize(g_glfwWindow, &width, &height);
 
-	return createSwapChain(width, height)
+	bool result =
+		   createSwapChain(width, height)
 		&& createSwapChainImageViews()
 		&& createRenderPass()
 		&& createDepthResources()
 		&& createFramebuffers()
 		&& createCommandBuffers();
+
+	// Iterate through all the render states
+	// to notify swap chains have changed.
+	for (auto rs : renderStates) {
+		result |= rs->onSwapChainResize();
+	}
+	
+	return result;
 }
 
 bool ozz::sample::internal::ContextVulkan::registerRenderState(vk::RenderState* renderState)

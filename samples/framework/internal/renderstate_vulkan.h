@@ -47,6 +47,8 @@ namespace ozz {
 
 				internal::ContextVulkan* renderContext;
 
+				RenderState() { }
+
 			public:
 
 				virtual ~RenderState() { }
@@ -59,8 +61,16 @@ namespace ozz {
 
 				// This function is called when command buffers are recorded,
 				// between vkCmdBeginRenderPass() and vkCmdEndRenderPass.
-				virtual bool onRegisterRenderPass() = 0;
+				virtual bool onRegisterRenderPass(size_t commandIndex) = 0;
 
+				// This is called when the swap chain get a resize update,
+				// it give the chance to re-initialize the graphics pipeline.
+				virtual bool onSwapChainResize() = 0;
+
+				// This check is executed every frame, and if true,
+				// the render-context render-pass has to be reset
+				// and re-recorded.
+				virtual bool isDirty() = 0;
 			};
 
 		}

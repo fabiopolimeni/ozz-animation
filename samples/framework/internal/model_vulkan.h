@@ -58,13 +58,13 @@ namespace ozz {
 					} color;
 				};
 
-				struct ModelBufferObject {
+				struct GeometryBuffersObject {
 					std::vector<Vertex>		vertices;	// Vertex buffer
 					std::vector<uint32_t>	indices;	// Index buffer
 				};
 
 				struct InstancesBufferObject {
-					std::vector<ozz::math::Float4x4>	transform;	// instance transformation matrices
+					std::vector<ozz::math::Float4x4>	transforms;	// instance transformation matrices
 				};
 
 				struct TextureSamplerObject {
@@ -80,7 +80,7 @@ namespace ozz {
 				};
 
 				struct InitData {
-					ModelBufferObject		vbo;		// Model buffers (vertices and indices) object
+					GeometryBuffersObject	gbo;		// Geometry buffers (vertices and indices) object
 					InstancesBufferObject	ibo;		// Instances buffer (transformation matrix) object
 					TextureSamplerObject	tso;		// Texture sampler object
 				};
@@ -91,15 +91,15 @@ namespace ozz {
 						UDF_INDEX_BUFFER = 0x02,
 						UDF_INSTANCE_BUFFER = 0x04,
 						UDF_UNIFORM_BUFFER = 0x08,
-						UDF_TEXTURE_SAMPLER = 0x10,
+						UDF_TEXTURE_IMAGE_BUFFER = 0x10,
 						UDF_ALL = UDF_VERTEX_BUFFER
 								| UDF_INDEX_BUFFER
 								| UDF_INSTANCE_BUFFER
 								| UDF_UNIFORM_BUFFER
-								| UDF_TEXTURE_SAMPLER
+								| UDF_TEXTURE_IMAGE_BUFFER
 					};
 
-					ModelBufferObject		vbo;		// Model buffers (vertices and indices) object
+					GeometryBuffersObject	gbo;		// Geometry buffers (vertices and indices) object
 					InstancesBufferObject	ibo;		// Instances buffer (transformation matrix) object
 					TextureSamplerObject	tso;		// Texture sampler object
 					UniformBufferObject		ubo;		// Uniform buffer (MVP) object
@@ -115,6 +115,7 @@ namespace ozz {
 				uint32_t numOfInstances;
 				uint32_t texWidth;
 				uint32_t texHeight;
+				bool dirty;
 
 				vk::deleter_ptr<VkDescriptorSetLayout> descriptorSetLayout{ renderContext->device, vkDestroyDescriptorSetLayout };
 				vk::deleter_ptr<VkPipelineLayout> pipelineLayout{ renderContext->device, vkDestroyPipelineLayout };
@@ -143,20 +144,33 @@ namespace ozz {
 
 				void createDescriptorSetLayout();
 				void createGraphicsPipeline();
+				void createUniformBuffer();
+				void createDescriptorPool();
+
 				void createTextureImage(const uint8_t* pixels, uint32_t width, uint32_t height);
 				void createTextureImageView();
 				void createTextureSampler();
 				void createVertexBuffer(const std::vector<Vertex>& vertices);
 				void createIndexBuffer(const std::vector<uint32_t>& indices);
-				void createUniformBuffer();
-				void updateUniformBuffer(const UniformBufferObject& ubo);
-				void createDescriptorPool();
+				void createInstanceBuffer(const std::vector<ozz::math::Float4x4>& transforms);
 				void createDescriptorSet();
 
+				void updateVertexBuffer(const std::vector<Vertex>& vertices);
+				void updateIndexBuffer(const std::vector<uint32_t>& indices);
+				void updateInstanceBuffer(const std::vector<ozz::math::Float4x4>& transforms);
+				void updateTextureImage(const uint8_t* pixels, uint32_t width, uint32_t height);
+
+				// These series of function return whether or not the respective
+				// buffer needed to be re-created as a result of the update.
+				bool updateGeometryBufferObject(const GeometryBuffersObject& gbo);
+				bool updateInstanceBufferObject(const InstancesBufferObject& ibo);
+				bool updateTextureImageBufferObject(const TextureSamplerObject& tso);
+				bool updateUniformBufferObject(const UniformBufferObject& ubo);
+				
 			public:
 
 				// Ctor
-				ModelRenderState(const InitData& initData);
+				ModelRenderState();
 				virtual ~ModelRenderState();
 
 				// Gives a chance to create the render resources
@@ -166,8 +180,17 @@ namespace ozz {
 				virtual void onReleaseResources() override;
 
 				// This function is called when command buffers are recorded,
-				// between vkCmdBeginRenderPass() and vkCmdEndRenderPass.
-				virtual bool onRegisterRenderPass() override;
+				// between vkCmdBeginRenderPass() and vkCmdEndRenderPass()
+				virtual bool onRegisterRenderPass(size_t commandIndex) override;
+
+				virtual bool onSwapChainResize() override;
+
+				// Made dirty whenever we have to recreate any of the buffers,
+				// as these have to be re-bound to the render pass
+				virtual bool isDirty() override;
+
+				// Initialize the template with meaningful data
+				bool init(const InitData& initData);
 
 				// Update render state according to the flags
 				bool update(const UpdateData& updateData);

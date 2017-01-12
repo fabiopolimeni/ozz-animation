@@ -30,13 +30,11 @@
 #include "framework/internal/renderstate_vulkan.h"
 #include "framework/internal/context_vulkan.h"
 
-bool ozz::sample::vk::RenderState::onInitResources(internal::ContextVulkan* context)
-{
+bool ozz::sample::vk::RenderState::onInitResources(internal::ContextVulkan* context) {
 	renderContext = context;
 	return true;
 }
 
-void ozz::sample::vk::RenderState::onReleaseResources()
-{
+void ozz::sample::vk::RenderState::onReleaseResources() {
 	renderContext = nullptr;
 }
