@@ -59,7 +59,7 @@ std::array<VkVertexInputAttributeDescription, 4> ozz::sample::vk::ModelRenderSta
 
 	attributeDescriptions[3].binding = 0;
 	attributeDescriptions[3].location = 3;
-	attributeDescriptions[3].format = VK_FORMAT_B8G8R8A8_UNORM;
+	attributeDescriptions[3].format = VK_FORMAT_R8G8B8A8_UNORM;
 	attributeDescriptions[3].offset = offsetof(Vertex, color);
 
 	return attributeDescriptions;
@@ -213,7 +213,7 @@ void ozz::sample::vk::ModelRenderState::createGraphicsPipeline() {
 	pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
 
 	CHECK_VK_RESULT(vkCreateGraphicsPipelines(renderContext->device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, graphicsPipeline.replace()));
-	dirty = true;
+	setDirty(true);
 }
 
 void ozz::sample::vk::ModelRenderState::createTextureImage(const uint8_t* pixels, uint32_t width, uint32_t height) {
@@ -229,12 +229,12 @@ void ozz::sample::vk::ModelRenderState::createTextureImage(const uint8_t* pixels
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, textureImage, textureImageMemory);
 
 	updateTextureImage(pixels, width, height);
-	dirty = true;
+	setDirty(true);
 }
 
 void ozz::sample::vk::ModelRenderState::createTextureImageView() {
 	createImageView(renderContext->device, textureImage, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT, textureImageView);
-	dirty = true;
+	setDirty(true);
 }
 
 void ozz::sample::vk::ModelRenderState::createTextureSampler() {
@@ -254,7 +254,7 @@ void ozz::sample::vk::ModelRenderState::createTextureSampler() {
 	samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
 
 	CHECK_VK_RESULT(vkCreateSampler(renderContext->device, &samplerInfo, nullptr, textureSampler.replace()));
-	dirty = true;
+	setDirty(true);
 }
 
 void ozz::sample::vk::ModelRenderState::createVertexBuffer(const std::vector<Vertex>& vertices) {
@@ -269,7 +269,7 @@ void ozz::sample::vk::ModelRenderState::createVertexBuffer(const std::vector<Ver
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, vertexBuffer, vertexBufferMemory);
 	
 	updateVertexBuffer(vertices);	
-	dirty = true;
+	setDirty(true);
 }
 
 void ozz::sample::vk::ModelRenderState::createIndexBuffer(const std::vector<uint32_t>& indices) {
@@ -284,7 +284,7 @@ void ozz::sample::vk::ModelRenderState::createIndexBuffer(const std::vector<uint
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, indexBuffer, indexBufferMemory);
 
 	updateIndexBuffer(indices);
-	dirty = true;
+	setDirty(true);
 }
 
 void ozz::sample::vk::ModelRenderState::createInstanceBuffer(
@@ -299,7 +299,7 @@ void ozz::sample::vk::ModelRenderState::createUniformBuffer() {
 		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, uniformStagingBuffer, uniformStagingBufferMemory);
 	createBuffer(renderContext->physicalDevice, renderContext->device, bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, uniformBuffer, uniformBufferMemory);
-	dirty = true;
+	setDirty(true);
 }
 
 void ozz::sample::vk::ModelRenderState::createDescriptorPool() {
@@ -357,7 +357,7 @@ void ozz::sample::vk::ModelRenderState::createDescriptorSet() {
 	descriptorWrites[1].pImageInfo = &imageInfo;
 
 	vkUpdateDescriptorSets(renderContext->device, static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
-	dirty = true;
+	setDirty(true);
 }
 
 void ozz::sample::vk::ModelRenderState::updateVertexBuffer(const std::vector<Vertex>& vertices) {
@@ -542,8 +542,30 @@ ozz::sample::vk::ModelRenderState::~ModelRenderState() {
 
 }
 
+void ozz::sample::vk::ModelRenderState::setupDeleterPtrs() {
+	descriptorSetLayout = { renderContext->device, vkDestroyDescriptorSetLayout };
+	pipelineLayout = { renderContext->device, vkDestroyPipelineLayout };
+	graphicsPipeline = { renderContext->device, vkDestroyPipeline };
+	textureImage = { renderContext->device, vkDestroyImage };
+	textureImageMemory = { renderContext->device, vkFreeMemory };
+	textureImageView = { renderContext->device, vkDestroyImageView };
+	textureSampler = { renderContext->device, vkDestroySampler };
+	vertexBuffer = { renderContext->device, vkDestroyBuffer };
+	vertexBufferMemory = { renderContext->device, vkFreeMemory };
+	indexBuffer = { renderContext->device, vkDestroyBuffer };
+	indexBufferMemory = { renderContext->device, vkFreeMemory };
+	uniformStagingBuffer = { renderContext->device, vkDestroyBuffer };
+	uniformStagingBufferMemory = { renderContext->device, vkFreeMemory };
+	uniformBuffer = { renderContext->device, vkDestroyBuffer };
+	uniformBufferMemory = { renderContext->device, vkFreeMemory };
+	descriptorPool = { renderContext->device, vkDestroyDescriptorPool };
+}
+
 bool ozz::sample::vk::ModelRenderState::onInitResources(internal::ContextVulkan* context) {
 	if (RenderState::onInitResources(context)) {
+
+		setupDeleterPtrs();
+
 		createDescriptorSetLayout();
 		createGraphicsPipeline();
 		createUniformBuffer();
@@ -560,30 +582,33 @@ void ozz::sample::vk::ModelRenderState::onReleaseResources() {
 
 bool ozz::sample::vk::ModelRenderState::onRegisterRenderPass(size_t commandIndex) {	
 	VkCommandBuffer commandBuffer = renderContext->commandBuffers[commandIndex];
-
-	vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
-
+	
 	VkBuffer vertexBuffers[] = { vertexBuffer };
 	VkDeviceSize offsets[] = { 0 };
 	vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
-
 	vkCmdBindIndexBuffer(commandBuffer, indexBuffer, 0, VK_INDEX_TYPE_UINT32);
-
 	vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSet, 0, nullptr);
-
+	vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
 	vkCmdDrawIndexed(commandBuffer, numOfIndices, 1, 0, 0, 0);
 
-	dirty = false;
 	return true;
 }
 
-bool ozz::sample::vk::ModelRenderState::onSwapChainResize() {
+void ozz::sample::vk::ModelRenderState::onRenderPassesComplete() {
+	setDirty(false);
+}
+
+bool ozz::sample::vk::ModelRenderState::onSwapChainChange() {
 	createGraphicsPipeline();
 	return true;
 }
 
 bool ozz::sample::vk::ModelRenderState::isDirty() {
 	return dirty;
+}
+
+void ozz::sample::vk::ModelRenderState::setDirty(bool bDirty) {
+	dirty = bDirty;
 }
 
 bool ozz::sample::vk::ModelRenderState::init(const InitData& initData) {

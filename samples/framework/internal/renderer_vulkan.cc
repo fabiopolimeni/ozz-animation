@@ -28,6 +28,7 @@
 #define OZZ_INCLUDE_PRIVATE_HEADER  // Allows to include private headers.
 
 #include "ozz/base/log.h"
+#include "framework/application.h"
 #include "framework/renderer.h"
 #include "framework/camera.h"
 #include "framework/internal/renderer_vulkan.h"
@@ -50,6 +51,8 @@ ozz::sample::internal::RendererVulkan::RendererVulkan(Camera * _camera)
 
 ozz::sample::internal::RendererVulkan::~RendererVulkan()
 {
+	context_->destroyRenderState(rs_shaded_boxes_);
+
 	context_->shutdown();
 	memory::default_allocator()->Delete(context_);
 }
@@ -99,18 +102,18 @@ bool ozz::sample::internal::RendererVulkan::DrawBoxShaded(const ozz::math::Box &
 		// front-face
 		{
 			std::vector<vk::ModelRenderState::Vertex> front_face = {
-				//				position							normal								uvs										color
-				{ ozz::math::Float3(-0.5f, -0.5f, 0.5f), ozz::math::Float3(0.0f, 0.0f, 1.0f), ozz::math::Float2(0.0f, 0.0f), { _color.r, _color.g, _color.b, _color.a } },
-				{ ozz::math::Float3(0.5f, -0.5f, 0.5f),  ozz::math::Float3(0.0f, 0.0f, 1.0f), ozz::math::Float2(1.0f, 0.0f), { _color.r, _color.g, _color.b, _color.a } },
-				{ ozz::math::Float3(0.5f,  0.5f, 0.5f),  ozz::math::Float3(0.0f, 0.0f, 1.0f), ozz::math::Float2(1.0f, 1.0f), { _color.r, _color.g, _color.b, _color.a } },
-				{ ozz::math::Float3(-0.5f,  0.5f, 0.5f), ozz::math::Float3(0.0f, 0.0f, 1.0f), ozz::math::Float2(0.0f, 1.0f), { _color.r, _color.g, _color.b, _color.a } }
+				//				position							normal								uvs								color
+				{ ozz::math::Float3(-0.5f,  0.5f, 10.5f), ozz::math::Float3(0.0f, 0.0f, 1.0f), ozz::math::Float2(0.0f, 0.0f), { 255,   0,   0, 255 } },
+				{ ozz::math::Float3( 0.5f,  0.5f, 10.5f), ozz::math::Float3(0.0f, 0.0f, 1.0f), ozz::math::Float2(1.0f, 0.0f), {   0, 255,   0, 255 } },
+				{ ozz::math::Float3( 0.5f, -0.5f, 10.5f), ozz::math::Float3(0.0f, 0.0f, 1.0f), ozz::math::Float2(1.0f, 1.0f), {   0,   0, 255, 255 } },
+				{ ozz::math::Float3(-0.5f, -0.5f, 10.5f), ozz::math::Float3(0.0f, 0.0f, 1.0f), ozz::math::Float2(0.0f, 1.0f), { 255, 255,   0, 255 } }
 			};
 
 			const uint32_t start_index = static_cast<uint32_t>(init_data.gbo.vertices.size());
 
 			// triangle face
 			init_data.gbo.indices.insert(std::begin(init_data.gbo.indices), {
-				start_index + 0, start_index + 1, start_index + 2, start_index + 2, start_index + 3, start_index + 0 });
+				start_index + 0, start_index + 3, start_index + 2, start_index + 2, start_index + 1, start_index + 0 });
 
 			// vertices
 			init_data.gbo.vertices.insert(std::begin(init_data.gbo.vertices), std::begin(front_face), std::end(front_face));
@@ -137,12 +140,15 @@ bool ozz::sample::internal::RendererVulkan::DrawBoxShaded(const ozz::math::Box &
 	}
 
 	vk::ModelRenderState::UpdateData update_data;
+	update_data.flags = vk::ModelRenderState::UpdateData::UDF_NONE;
 
 	// Update instances buffer
-	const auto numOfInstances = _transforms.Count();
-	update_data.ibo.transforms.resize(numOfInstances);
-	for (auto iIt = 0; iIt < numOfInstances; ++iIt) {
-		update_data.ibo.transforms[iIt] = _transforms[iIt];
+	{
+		const auto numOfInstances = _transforms.Count();
+		update_data.ibo.transforms.resize(numOfInstances);
+		for (auto iIt = 0; iIt < numOfInstances; ++iIt) {
+			update_data.ibo.transforms[iIt] = _transforms[iIt];
+		}
 	}
 
 	// Update uniform buffer
@@ -153,11 +159,10 @@ bool ozz::sample::internal::RendererVulkan::DrawBoxShaded(const ozz::math::Box &
 		update_data.ubo.proj = camera_->projection();
 
 		// Update the uniform buffer
-		update_data.flags = vk::ModelRenderState::UpdateData::UDF_UNIFORM_BUFFER;
-
-		rs_shaded_boxes_->update(update_data);
+		update_data.flags |= vk::ModelRenderState::UpdateData::UDF_UNIFORM_BUFFER;
 	}
 
+	rs_shaded_boxes_->update(update_data);
 	return true;
 }
 

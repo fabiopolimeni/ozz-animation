@@ -62,6 +62,9 @@ class Application {
   // Destroys the application. Cleans up everything.
   virtual ~Application();
 
+  // Return the singleton instance of this class/object
+  inline static Application* GetInstance() { return application_; }
+
   // Runs application main loop.
   // Caller must provide main function arguments, as well as application version
   // and usage strings.
@@ -72,8 +75,7 @@ class Application {
   int Run(int _argc, const char** _argv, const char* _version,
           const char* _title);
 
-  // Return the singleton instance of this class/object
-  inline static Application* GetInstance() { return application_; }
+  void SetResolution(const Resolution& _resolution);
 
   inline Camera* GetCamera() const { return camera_; }
   inline Shooter* GetShooter() const { return shooter_; }
@@ -81,8 +83,9 @@ class Application {
   inline ImGui* GetGUI() const { return im_gui_; }
   inline const std::string& GetTile() const { return title_; }
 
-  inline void SetResolution(const Resolution& _resolution) {
-	  application_->resolution_ = _resolution; }
+  inline Resolution GetResolution() const {
+	  return resolution_;
+  }
 
   inline void RequestExit() { exit_ = true; }
 

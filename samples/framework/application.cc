@@ -127,15 +127,6 @@ void glfw_fb_resize_callback(GLFWwindow* /*_window*/, int _width, int _height) {
 		if (auto* renderer_ = application_->GetRenderer()) {
 			renderer_->OnResize(_width, _height);
 		}
-
-		// Forwards screen size to camera and shooter.
-		if (auto* camera_ = application_->GetCamera()) {
-			application_->GetCamera()->Resize(_width, _height);
-		}
-
-		if (auto* shooter_ = application_->GetShooter()) {
-			shooter_->Resize(_width, _height);
-		}
 	}
 }
 
@@ -320,7 +311,7 @@ int Application::Run(int _argc, const char** _argv, const char* _version,
 	     glfwGetFramebufferSize(g_glfwWindow, &width_, &height_);
 	     glfw_resize_callback(g_glfwWindow, width_, height_);
 	  }
-       
+
       // Loop the sample.
       success = Loop();
        
@@ -351,6 +342,20 @@ int Application::Run(int _argc, const char** _argv, const char* _version,
 
   application_ = NULL;
   return success ? EXIT_SUCCESS : EXIT_FAILURE;
+}
+
+void Application::SetResolution(const Resolution& _resolution)
+{
+	application_->resolution_ = _resolution;
+
+	// Forwards screen size to camera and shooter.
+	if (camera_) {
+		camera_->Resize(resolution_.width, resolution_.height);
+	}
+
+	if (shooter_) {
+		shooter_->Resize(resolution_.width, resolution_.height);
+	}
 }
 
 void OneLoopCbk(void* _arg) {

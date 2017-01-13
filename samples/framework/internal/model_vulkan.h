@@ -87,6 +87,7 @@ namespace ozz {
 
 				struct UpdateData {
 					enum UpdateFalgs {
+						UDF_NONE = 0x00,
 						UDF_VERTEX_BUFFER = 0x01,
 						UDF_INDEX_BUFFER = 0x02,
 						UDF_INSTANCE_BUFFER = 0x04,
@@ -142,6 +143,8 @@ namespace ozz {
 				VkVertexInputBindingDescription getVertexBindingDescription();
 				std::array<VkVertexInputAttributeDescription, 4> getVertexAttributeDescriptions();
 
+				void setupDeleterPtrs();
+
 				void createDescriptorSetLayout();
 				void createGraphicsPipeline();
 				void createUniformBuffer();
@@ -167,6 +170,8 @@ namespace ozz {
 				bool updateTextureImageBufferObject(const TextureSamplerObject& tso);
 				bool updateUniformBufferObject(const UniformBufferObject& ubo);
 				
+				void setDirty(bool bDirty);
+
 			public:
 
 				// Ctor
@@ -183,7 +188,13 @@ namespace ozz {
 				// between vkCmdBeginRenderPass() and vkCmdEndRenderPass()
 				virtual bool onRegisterRenderPass(size_t commandIndex) override;
 
-				virtual bool onSwapChainResize() override;
+				// Because we can have multiple render passes,
+				// this callback specify when the render context
+				// has finished to register them all.
+				virtual void onRenderPassesComplete() override;
+
+				// Notified when the swap chain has changed, e.g. resized.
+				virtual bool onSwapChainChange() override;
 
 				// Made dirty whenever we have to recreate any of the buffers,
 				// as these have to be re-bound to the render pass

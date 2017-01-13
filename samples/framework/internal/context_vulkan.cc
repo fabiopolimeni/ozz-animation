@@ -450,7 +450,7 @@ bool ozz::sample::internal::ContextVulkan::createCommandBuffers()
 
 				// Iterate through all the render states and
 				// register their binding and drawing operations.
-				for (auto rs : renderStates) {
+				for (auto* rs : renderStates) {
 					rs->onRegisterRenderPass(i);
 				}
 
@@ -504,6 +504,19 @@ void ozz::sample::internal::ContextVulkan::shutdown()
 
 bool ozz::sample::internal::ContextVulkan::drawFrame()
 {
+	// It might happen that we have re-created a render state
+	// since last time we issued a render command, therefore,
+	// we eventually need to register its render-pass commands
+	// to the render command buffer.
+	bool b_recreate_coommand_buffers = false;
+	for (auto* rs : renderStates) {
+		b_recreate_coommand_buffers |= rs->isDirty();
+	}
+
+	if (b_recreate_coommand_buffers) {
+		createCommandBuffers();
+	}
+
 	uint32_t imageIndex;
 	VkResult result = vkAcquireNextImageKHR(device, swapChain, std::numeric_limits<uint64_t>::max(), imageAvailableSemaphore, VK_NULL_HANDLE, &imageIndex);
 
@@ -563,11 +576,10 @@ bool ozz::sample::internal::ContextVulkan::drawFrame()
 
 bool ozz::sample::internal::ContextVulkan::recreateSwapChain()
 {
-	vkDeviceWaitIdle(device);
-
 	int32_t width, height;
 	glfwGetFramebufferSize(g_glfwWindow, &width, &height);
 
+	vkDeviceWaitIdle(device);
 	bool result =
 		   createSwapChain(width, height)
 		&& createSwapChainImageViews()
@@ -577,9 +589,9 @@ bool ozz::sample::internal::ContextVulkan::recreateSwapChain()
 		&& createCommandBuffers();
 
 	// Iterate through all the render states
-	// to notify swap chains have changed.
-	for (auto rs : renderStates) {
-		result |= rs->onSwapChainResize();
+	// to notify swap chain has changed.
+	for (auto* rs : renderStates) {
+		result |= rs->onSwapChainChange();
 	}
 	
 	return result;
@@ -598,6 +610,7 @@ bool ozz::sample::internal::ContextVulkan::registerRenderState(vk::RenderState* 
 
 void ozz::sample::internal::ContextVulkan::destroyRenderState(vk::RenderState* renderState)
 {
+	vkDeviceWaitIdle(device);
 	auto rsIt = std::find(renderStates.cbegin(), renderStates.cend(), renderState);
 	if (rsIt != std::end(renderStates)) {
 		renderState->onReleaseResources();
