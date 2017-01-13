@@ -37,6 +37,7 @@
 #include "ozz/base/maths/vec_float.h"
 #include "ozz/base/maths/simd_math.h"
 
+#include "framework/renderer.h"
 #include "framework/internal/renderstate_vulkan.h"
 #include "framework/internal/tools_vulkan.h"
 #include "framework/internal/context_vulkan.h"
@@ -53,9 +54,7 @@ namespace ozz {
 					ozz::math::Float3	pos;
 					ozz::math::Float3	normal;
 					ozz::math::Float2	uv;
-					struct {
-						uint8_t r, g, b, a;
-					} color;
+					Renderer::Color		color;
 				};
 
 				struct GeometryBuffersObject {

@@ -28,6 +28,7 @@
 #define OZZ_INCLUDE_PRIVATE_HEADER  // Allows to include private headers.
 
 #include "ozz/base/log.h"
+#include "ozz/base/maths/box.h"
 #include "framework/application.h"
 #include "framework/renderer.h"
 #include "framework/camera.h"
@@ -96,38 +97,85 @@ bool ozz::sample::internal::RendererVulkan::DrawBoxShaded(const ozz::math::Box &
 {
 	// If a shaded box render state doesn't exist yet, create one
 	if (!rs_shaded_boxes_) {
+
+		const math::Float3 pos[8] = {
+			math::Float3(_box.min.x, _box.min.y, 12.f + _box.min.z),
+			math::Float3(_box.max.x, _box.min.y, 12.f + _box.min.z),
+			math::Float3(_box.max.x, _box.max.y, 12.f + _box.min.z),
+			math::Float3(_box.min.x, _box.max.y, 12.f + _box.min.z),
+			math::Float3(_box.min.x, _box.min.y, 12.f + _box.max.z),
+			math::Float3(_box.max.x, _box.min.y, 12.f + _box.max.z),
+			math::Float3(_box.max.x, _box.max.y, 12.f + _box.max.z),
+			math::Float3(_box.min.x, _box.max.y, 12.f + _box.max.z)
+		};
+
+		const math::Float3 normals[6] = {
+			math::Float3(-1,  0,  0),	// n0. left
+			math::Float3(1,  0,  0),	// n1. right
+			math::Float3(0, -1,  0),	// n2. bottom
+			math::Float3(0,  1,  0),	// n3. top
+			math::Float3(0,  0, -1),	// n4. front
+			math::Float3(0,  0,  1)		// n5. back
+		};
+
+		const math::Float2 uvs[4] = {
+			math::Float2(0.0f, 0.0f),	// t0. top-left
+			math::Float2(1.0f, 0.0f),	// t1. top-right
+			math::Float2(1.0f, 1.0f),	// t2. bottom-right
+			math::Float2(0.0f, 1.0f)	// t3. bottom-left
+		};
+
+		std::vector<vk::ModelRenderState::Vertex> vertices = {
+			// n4. front
+			{ pos[0], normals[4], uvs[3], _color },
+			{ pos[1], normals[4], uvs[0], _color },
+			{ pos[2], normals[4], uvs[2], _color },
+			{ pos[3], normals[4], uvs[0], _color },
+			// n1. right
+			{ pos[1], normals[1], uvs[3], _color },
+			{ pos[5], normals[1], uvs[0], _color },
+			{ pos[6], normals[1], uvs[2], _color },
+			{ pos[2], normals[1], uvs[0], _color },
+			// n5. top
+			{ pos[3], normals[3], uvs[3], _color },
+			{ pos[2], normals[3], uvs[0], _color },
+			{ pos[6], normals[3], uvs[2], _color },
+			{ pos[7], normals[3], uvs[0], _color },
+			// n0. left
+			{ pos[4], normals[0], uvs[3], _color },
+			{ pos[0], normals[0], uvs[0], _color },
+			{ pos[3], normals[0], uvs[2], _color },
+			{ pos[7], normals[0], uvs[0], _color },
+			// n2. bottom
+			{ pos[4], normals[2], uvs[3], _color },
+			{ pos[5], normals[2], uvs[0], _color },
+			{ pos[1], normals[2], uvs[2], _color },
+			{ pos[0], normals[2], uvs[0], _color },
+			// n5. back
+			{ pos[5], normals[5], uvs[3], _color },
+			{ pos[4], normals[5], uvs[0], _color },
+			{ pos[7], normals[5], uvs[2], _color },
+			{ pos[6], normals[5], uvs[0], _color }
+		};
+
+		static std::vector<uint32_t> indices = {
+			0,  1,  2,  2,  3,  0,
+			4,  5,  6,  6,  7,  4,
+			8,  9, 10, 10, 11,  8,
+		   12, 13, 14, 14, 15, 12,
+		   16, 17, 18, 18, 19, 16,
+		   20, 21, 22, 22, 23, 20
+		};
+
 		// Create a new model-render-state template
 		vk::ModelRenderState::InitData init_data;
 
-		// front-face
-		{
-			std::vector<vk::ModelRenderState::Vertex> front_face = {
-				//				position							normal								uvs								color
-				{ ozz::math::Float3(-0.5f,  0.5f, 10.5f), ozz::math::Float3(0.0f, 0.0f, 1.0f), ozz::math::Float2(0.0f, 0.0f), { 255,   0,   0, 255 } },
-				{ ozz::math::Float3( 0.5f,  0.5f, 10.5f), ozz::math::Float3(0.0f, 0.0f, 1.0f), ozz::math::Float2(1.0f, 0.0f), {   0, 255,   0, 255 } },
-				{ ozz::math::Float3( 0.5f, -0.5f, 10.5f), ozz::math::Float3(0.0f, 0.0f, 1.0f), ozz::math::Float2(1.0f, 1.0f), {   0,   0, 255, 255 } },
-				{ ozz::math::Float3(-0.5f, -0.5f, 10.5f), ozz::math::Float3(0.0f, 0.0f, 1.0f), ozz::math::Float2(0.0f, 1.0f), { 255, 255,   0, 255 } }
-			};
-
-			const uint32_t start_index = static_cast<uint32_t>(init_data.gbo.vertices.size());
-
-			// triangle face
-			init_data.gbo.indices.insert(std::begin(init_data.gbo.indices), {
-				start_index + 0, start_index + 3, start_index + 2, start_index + 2, start_index + 1, start_index + 0 });
-
-			// vertices
-			init_data.gbo.vertices.insert(std::begin(init_data.gbo.vertices), std::begin(front_face), std::end(front_face));
-		}
-
-		// TODO: ...
-		// back-face
-		// top-face
-		// bottom-face
-		// right-face
-		// left-face
+		// Set vertices and indices
+		init_data.gbo.vertices = vertices;
+		init_data.gbo.indices = indices;
 
 		// Static magenta texture
-		static const uint32_t magenta_color = 0xFF00FFFF;
+		static const uint32_t magenta_color = 0xFFFF00FF;
 		init_data.tso.width = 1;
 		init_data.tso.height = 1;
 		init_data.tso.pixels = (const uint8_t*)(&magenta_color);
