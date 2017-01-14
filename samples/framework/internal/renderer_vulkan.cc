@@ -199,7 +199,6 @@ bool ozz::sample::internal::RendererVulkan::DrawBoxShaded(const ozz::math::Box &
 
 		// Update the instance buffer
 		update_data.flags |= vk::ModelRenderState::UpdateData::UDF_INSTANCE_BUFFER;
-;
 	}
 
 	// Update uniform buffer
