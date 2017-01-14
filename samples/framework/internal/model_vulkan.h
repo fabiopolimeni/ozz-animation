@@ -117,29 +117,31 @@ namespace ozz {
 				uint32_t texHeight;
 				bool dirty;
 
-				vk::deleter_ptr<VkDescriptorSetLayout> descriptorSetLayout{ renderContext->device, vkDestroyDescriptorSetLayout };
-				vk::deleter_ptr<VkPipelineLayout> pipelineLayout{ renderContext->device, vkDestroyPipelineLayout };
-				vk::deleter_ptr<VkPipeline> graphicsPipeline{ renderContext->device, vkDestroyPipeline };
+				vk::deleter_ptr<VkDescriptorSetLayout> descriptorSetLayout;
+				vk::deleter_ptr<VkPipelineLayout> pipelineLayout;
+				vk::deleter_ptr<VkPipeline> graphicsPipeline;
 
-				vk::deleter_ptr<VkImage> textureImage{ renderContext->device, vkDestroyImage };
-				vk::deleter_ptr<VkDeviceMemory> textureImageMemory{ renderContext->device, vkFreeMemory };
-				vk::deleter_ptr<VkImageView> textureImageView{ renderContext->device, vkDestroyImageView };
-				vk::deleter_ptr<VkSampler> textureSampler{ renderContext->device, vkDestroySampler };
+				vk::deleter_ptr<VkImage> textureImage;
+				vk::deleter_ptr<VkDeviceMemory> textureImageMemory;
+				vk::deleter_ptr<VkImageView> textureImageView;
+				vk::deleter_ptr<VkSampler> textureSampler;
 
-				vk::deleter_ptr<VkBuffer> vertexBuffer{ renderContext->device, vkDestroyBuffer };
-				vk::deleter_ptr<VkDeviceMemory> vertexBufferMemory{ renderContext->device, vkFreeMemory };
-				vk::deleter_ptr<VkBuffer> indexBuffer{ renderContext->device, vkDestroyBuffer };
-				vk::deleter_ptr<VkDeviceMemory> indexBufferMemory{ renderContext->device, vkFreeMemory };
+				vk::deleter_ptr<VkBuffer> vertexBuffer;
+				vk::deleter_ptr<VkDeviceMemory> vertexBufferMemory;
+				vk::deleter_ptr<VkBuffer> indexBuffer;
+				vk::deleter_ptr<VkDeviceMemory> indexBufferMemory;
+				vk::deleter_ptr<VkBuffer> instanceBuffer;
+				vk::deleter_ptr<VkDeviceMemory> instanceBufferMemory;
 
-				vk::deleter_ptr<VkBuffer> uniformStagingBuffer{ renderContext->device, vkDestroyBuffer };
-				vk::deleter_ptr<VkDeviceMemory> uniformStagingBufferMemory{ renderContext->device, vkFreeMemory };
-				vk::deleter_ptr<VkBuffer> uniformBuffer{ renderContext->device, vkDestroyBuffer };
-				vk::deleter_ptr<VkDeviceMemory> uniformBufferMemory{ renderContext->device, vkFreeMemory };
+				vk::deleter_ptr<VkBuffer> uniformStagingBuffer;
+				vk::deleter_ptr<VkDeviceMemory> uniformStagingBufferMemory;
+				vk::deleter_ptr<VkBuffer> uniformBuffer;
+				vk::deleter_ptr<VkDeviceMemory> uniformBufferMemory;
 
-				vk::deleter_ptr<VkDescriptorPool> descriptorPool{ renderContext->device, vkDestroyDescriptorPool };
+				vk::deleter_ptr<VkDescriptorPool> descriptorPool;
 				VkDescriptorSet descriptorSet;
 
-				VkVertexInputBindingDescription getVertexBindingDescription();
+				std::array<VkVertexInputBindingDescription, 2> getVertexBindingDescriptions();
 				std::array<VkVertexInputAttributeDescription, 4> getVertexAttributeDescriptions();
 
 				void setupDeleterPtrs();

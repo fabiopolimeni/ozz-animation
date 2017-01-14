@@ -30,13 +30,11 @@
 #include "ozz/base/log.h"
 #include "framework/internal/model_vulkan.h"
 
-VkVertexInputBindingDescription ozz::sample::vk::ModelRenderState::getVertexBindingDescription() {
-	VkVertexInputBindingDescription bindingDescription = {};
-	bindingDescription.binding = 0;
-	bindingDescription.stride = sizeof(ozz::sample::vk::ModelRenderState::Vertex);
-	bindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+std::array<VkVertexInputBindingDescription, 2> ozz::sample::vk::ModelRenderState::getVertexBindingDescriptions() {
+	VkVertexInputBindingDescription geometryBindingDesc = { 0, sizeof(ozz::sample::vk::ModelRenderState::Vertex), VK_VERTEX_INPUT_RATE_VERTEX };
+	VkVertexInputBindingDescription instanceBindingDesc = { 0, sizeof(ozz::math::Float4x4), VK_VERTEX_INPUT_RATE_INSTANCE };
 
-	return bindingDescription;
+	return { geometryBindingDesc, instanceBindingDesc };
 }
 
 std::array<VkVertexInputAttributeDescription, 4> ozz::sample::vk::ModelRenderState::getVertexAttributeDescriptions() {
@@ -118,12 +116,12 @@ void ozz::sample::vk::ModelRenderState::createGraphicsPipeline() {
 	VkPipelineVertexInputStateCreateInfo vertexInputInfo = {};
 	vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
 
-	auto bindingDescription = getVertexBindingDescription();
+	auto bindingDescriptions = getVertexBindingDescriptions();
 	auto attributeDescriptions = getVertexAttributeDescriptions();
 
-	vertexInputInfo.vertexBindingDescriptionCount = 1;
+	vertexInputInfo.vertexBindingDescriptionCount = static_cast<uint32_t>(bindingDescriptions.size());;
 	vertexInputInfo.vertexAttributeDescriptionCount = static_cast<uint32_t>(attributeDescriptions.size());
-	vertexInputInfo.pVertexBindingDescriptions = &bindingDescription;
+	vertexInputInfo.pVertexBindingDescriptions = bindingDescriptions.data();
 	vertexInputInfo.pVertexAttributeDescriptions = attributeDescriptions.data();
 
 	VkPipelineInputAssemblyStateCreateInfo inputAssembly = {};
@@ -287,9 +285,19 @@ void ozz::sample::vk::ModelRenderState::createIndexBuffer(const std::vector<uint
 	setDirty(true);
 }
 
-void ozz::sample::vk::ModelRenderState::createInstanceBuffer(
-	const std::vector<ozz::math::Float4x4>& /*transforms*/) {
-	// TODO: ...
+void ozz::sample::vk::ModelRenderState::createInstanceBuffer(const std::vector<ozz::math::Float4x4>& transforms) {
+	VkDeviceSize bufferSize = sizeof(transforms[0]) * transforms.size();
+
+	// Store the number of instances, that is, we can decide
+	// later whether or not a buffer update requires to
+	// re-create the instance-buffer.
+	numOfIndices = static_cast<uint32_t>(transforms.size());
+	createBuffer(renderContext->physicalDevice, renderContext->device, bufferSize,
+		VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
+		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, instanceBuffer, instanceBufferMemory);
+
+	updateInstanceBuffer(transforms);
+	setDirty(true);
 }
 
 void ozz::sample::vk::ModelRenderState::createUniformBuffer() {
@@ -408,9 +416,28 @@ void ozz::sample::vk::ModelRenderState::updateIndexBuffer(const std::vector<uint
 	}
 }
 
-void ozz::sample::vk::ModelRenderState::updateInstanceBuffer(
-	const std::vector<ozz::math::Float4x4>& /*transforms*/) {
-	// TODO: ...
+void ozz::sample::vk::ModelRenderState::updateInstanceBuffer(const std::vector<ozz::math::Float4x4>& transforms) {
+	CHECK_AND_REPORT(instanceBuffer && instanceBufferMemory, "instanceBuffer and instanceBufferMemory have to be valid handles");
+	CHECK_AND_REPORT(transforms.size() == numOfInstances, "To update the instance buffer, the number of instances have to match");
+
+	VkDeviceSize bufferSize = sizeof(transforms[0]) * transforms.size();
+	deleter_ptr<VkBuffer> stagingBuffer{ renderContext->device, vkDestroyBuffer };
+	deleter_ptr<VkDeviceMemory> stagingBufferMemory{ renderContext->device, vkFreeMemory };
+	createBuffer(renderContext->physicalDevice, renderContext->device, bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
+
+	void* data;
+	vkMapMemory(renderContext->device, stagingBufferMemory, 0, bufferSize, 0, &data);
+	{
+		memcpy(data, transforms.data(), (size_t)bufferSize);
+		vkUnmapMemory(renderContext->device, stagingBufferMemory);
+	}
+
+	VkCommandBuffer commandBuffer = beginSingleTimeCommand(renderContext->device, renderContext->commandPool);
+	{
+		copyBuffer(stagingBuffer, instanceBuffer, bufferSize, commandBuffer);
+		endSingleTimeCommand(renderContext->device, renderContext->graphicsQueue, renderContext->commandPool, commandBuffer);
+	}
 }
 void ozz::sample::vk::ModelRenderState::updateTextureImage(const uint8_t* pixels, uint32_t width, uint32_t height) {
 	CHECK_AND_REPORT(pixels, "Texture's pixels need to point to valid memory");
@@ -563,7 +590,6 @@ void ozz::sample::vk::ModelRenderState::setupDeleterPtrs() {
 
 bool ozz::sample::vk::ModelRenderState::onInitResources(internal::ContextVulkan* context) {
 	if (RenderState::onInitResources(context)) {
-
 		setupDeleterPtrs();
 
 		createDescriptorSetLayout();
@@ -583,9 +609,9 @@ void ozz::sample::vk::ModelRenderState::onReleaseResources() {
 bool ozz::sample::vk::ModelRenderState::onRegisterRenderPass(size_t commandIndex) {	
 	VkCommandBuffer commandBuffer = renderContext->commandBuffers[commandIndex];
 	
-	VkBuffer vertexBuffers[] = { vertexBuffer };
 	VkDeviceSize offsets[] = { 0 };
-	vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
+	vkCmdBindVertexBuffers(commandBuffer, 0, 1, &vertexBuffer, offsets);
+	vkCmdBindVertexBuffers(commandBuffer, 0, 1, &instanceBuffer, offsets);
 	vkCmdBindIndexBuffer(commandBuffer, indexBuffer, 0, VK_INDEX_TYPE_UINT32);
 	vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSet, 0, nullptr);
 	vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);

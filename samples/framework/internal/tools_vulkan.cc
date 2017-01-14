@@ -265,7 +265,8 @@ namespace ozz {
 				}
 			}
 
-			VkFormat findSupportedFormat(VkPhysicalDevice physicalDevice, const std::vector<VkFormat>& candidates, VkImageTiling tiling, VkFormatFeatureFlags features) {
+			VkFormat findSupportedFormat(VkPhysicalDevice physicalDevice, const std::vector<VkFormat>& candidates,
+				VkImageTiling tiling, VkFormatFeatureFlags features) {
 				for (VkFormat format : candidates) {
 					VkFormatProperties props;
 					vkGetPhysicalDeviceFormatProperties(physicalDevice, format, &props);
@@ -550,7 +551,8 @@ namespace ozz {
 				vkCmdCopyBuffer(commandBuffer, srcBuffer, dstBuffer, 1, &copyRegion);
 			}
 
-			void updateBuffer(VkPhysicalDevice physicalDevice, VkDevice device, VkBuffer destBuffer, VkQueue queue, VkCommandPool commandPool, const uint8_t* bufData, size_t bufSize) {
+			void updateBuffer(VkPhysicalDevice physicalDevice, VkDevice device, VkBuffer destBuffer,
+				VkQueue queue, VkCommandPool commandPool, const uint8_t* bufData, size_t bufSize) {
 				VkDeviceSize bufferSize = bufSize;
 				
 				VkBuffer stagingBuffer;

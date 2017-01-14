@@ -97,7 +97,6 @@ bool ozz::sample::internal::RendererVulkan::DrawBoxShaded(const ozz::math::Box &
 {
 	// If a shaded box render state doesn't exist yet, create one
 	if (!rs_shaded_boxes_) {
-
 		const math::Float3 pos[8] = {
 			math::Float3(_box.min.x, _box.min.y, 12.f + _box.min.z),
 			math::Float3(_box.max.x, _box.min.y, 12.f + _box.min.z),
@@ -197,6 +196,10 @@ bool ozz::sample::internal::RendererVulkan::DrawBoxShaded(const ozz::math::Box &
 		for (auto iIt = 0; iIt < numOfInstances; ++iIt) {
 			update_data.ibo.transforms[iIt] = _transforms[iIt];
 		}
+
+		// Update the instance buffer
+		update_data.flags |= vk::ModelRenderState::UpdateData::UDF_INSTANCE_BUFFER;
+;
 	}
 
 	// Update uniform buffer
