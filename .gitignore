@@ -1,3 +1,5 @@
 build/
 build-cc/
+build-opengl/
+build-vulkan/
 .DS_Store

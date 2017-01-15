@@ -3,7 +3,7 @@ if(NOT ozz_build_samples)
 endif()
 
 # Options for Vulkan backend
-set(ozz_build_with_vulkan ON CACHE BOOL "Use vulkan as renderer for the samples")
+option(ozz_build_with_vulkan "Use vulkan as renderer for the samples" ON)
 set(ozz_vulkan_shader_directory "${CMAKE_SOURCE_DIR}/samples/framework/shaders/vulkan")
 
 if (WIN32 AND ozz_build_with_vulkan)

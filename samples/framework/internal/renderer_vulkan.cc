@@ -194,7 +194,7 @@ bool ozz::sample::internal::RendererVulkan::DrawBoxShaded(const ozz::math::Box &
 		const auto numOfInstances = _transforms.Count();
 		update_data.ibo.transforms.resize(numOfInstances);
 		for (auto iIt = 0; iIt < numOfInstances; ++iIt) {
-			update_data.ibo.transforms[iIt] = _transforms[iIt];
+			update_data.ibo.transforms[iIt] =  math::Float4x4::identity();  //_transforms[iIt];
 		}
 
 		// Update the instance buffer
@@ -205,7 +205,7 @@ bool ozz::sample::internal::RendererVulkan::DrawBoxShaded(const ozz::math::Box &
 	{
 		// Uniform data
 		update_data.ubo.model = math::Float4x4::identity();
-		update_data.ubo.view = camera_->view();
+		update_data.ubo.view = math::Float4x4::identity();// camera_->view();
 		update_data.ubo.proj = camera_->projection();
 
 		// Update the uniform buffer
