@@ -834,9 +834,6 @@ bool RendererOpenGL::DrawBoxShaded(
     GL(BufferSubData(GL_ARRAY_BUFFER, models_offset, _transforms.Size(),
                      _transforms.begin));
 
-	ozz::math::Float4x4 proj = camera()->projection();
-	ozz::math::Float4x4 view = math::Float4x4::Translation(math::simd_float4::Load(3.f, -5.f, 10.f, 1.f));
-
     ambient_shader_instanced->Bind(models_offset, camera()->view_proj(), stride,
                                    positions_offset, stride, normals_offset,
                                    stride, colors_offset);
