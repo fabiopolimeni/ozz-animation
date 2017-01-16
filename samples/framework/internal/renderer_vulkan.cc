@@ -44,6 +44,38 @@
 // TODO: Remove this warning disable instruction once all functions have been implemented
 #pragma warning(disable: 4100)
 
+namespace {
+	static ozz::math::Float4x4 getCorrectedModel(const ozz::math::Float4x4 model) {
+		ozz::math::Float4x4 model_matrix = model;
+		
+		model_matrix.cols[3] = model.cols[3] * ozz::math::simd_float4::Load(-1.f, 1.f, 1.f, 1.f);
+		return model_matrix;
+	}
+
+	static ozz::math::Float4x4 getCorrectedView(const ozz::math::Float4x4 view) {
+		ozz::math::Float4x4 view_matrix;
+		
+		view_matrix.cols[0] = view.cols[0] * ozz::math::simd_float4::Load(-1.f, -1.f, 1.f, 1.f);
+		view_matrix.cols[1] = view.cols[1] * ozz::math::simd_float4::Load(1.f, 1.f, -1.f, 1.f);
+		view_matrix.cols[2] = view.cols[2] * ozz::math::simd_float4::Load(1.f, 1.f, -1.f, 1.f);
+		view_matrix.cols[3] = view.cols[3] * ozz::math::simd_float4::Load(1.f, 1.f, -1.f, 1.f);
+		return view_matrix;
+	}
+
+	static ozz::math::Float4x4 getCorrectedProjection(const ozz::math::Float4x4 projection) {
+		ozz::math::Float4x4 projection_matrix = projection;
+		
+		ozz::math::Float4x4 clip;
+		clip.cols[0] = ozz::math::simd_float4::Load(1.0f, 0.0f, 0.0f, 0.0f);
+		clip.cols[1] = ozz::math::simd_float4::Load(0.0f, -1.0f, 0.0f, 0.0f);
+		clip.cols[2] = ozz::math::simd_float4::Load(0.0f, 0.0f, 0.5f, 0.0f);
+		clip.cols[3] = ozz::math::simd_float4::Load(0.0f, 0.0f, 0.5f, 1.0f);
+
+		projection_matrix.cols[2] = projection.cols[2] * ozz::math::simd_float4::Load(0.f, 0.f, -1.f, -1.f);
+		return clip * projection_matrix;
+	}
+}
+
 ozz::sample::internal::RendererVulkan::RendererVulkan(Camera * _camera)
 	: ozz::sample::Renderer(), camera_(_camera)
 	, rs_shaded_boxes_(nullptr)
@@ -194,11 +226,7 @@ bool ozz::sample::internal::RendererVulkan::DrawBoxShaded(const ozz::math::Box &
 		const auto numOfInstances = _transforms.Count();
 		update_data.ibo.transforms.resize(numOfInstances);
 		for (auto iIt = 0; iIt < numOfInstances; ++iIt) {
-			const auto& model = _transforms[iIt];
-			auto& instance = update_data.ibo.transforms[iIt];
-
-			instance = _transforms[iIt];
-			instance.cols[3] = model.cols[3] * math::simd_float4::Load(-1.f, 1.f, 1.f, 1.f);
+			update_data.ibo.transforms[iIt] = getCorrectedModel(_transforms[iIt]);
 		}
 
 		// Trigger instance buffer update
@@ -209,30 +237,8 @@ bool ozz::sample::internal::RendererVulkan::DrawBoxShaded(const ozz::math::Box &
 	{
 		// Uniform data
 		update_data.ubo.model = math::Float4x4::identity();
-		update_data.ubo.view = camera_->view();
-		update_data.ubo.proj = camera_->projection();
-
-		// Correct view matrix
-		{
-			update_data.ubo.view.cols[0] = update_data.ubo.view.cols[0] * math::simd_float4::Load(-1.f, -1.f, 1.f, 1.f);
-			update_data.ubo.view.cols[1] = update_data.ubo.view.cols[1] * math::simd_float4::Load(1.f, 1.f, -1.f, 1.f);
-			update_data.ubo.view.cols[2] = update_data.ubo.view.cols[2] * math::simd_float4::Load(1.f, 1.f, -1.f, 1.f);
-			update_data.ubo.view.cols[3] = update_data.ubo.view.cols[3] * math::simd_float4::Load(1.f, 1.f, -1.f, 1.f);
-		}
-
-		// Correct projection matrix
-		{
-			ozz::math::Float4x4 clip;
-			clip.cols[0] = math::simd_float4::Load(1.0f, 0.0f, 0.0f, 0.0f);
-			clip.cols[1] = math::simd_float4::Load(0.0f, -1.0f, 0.0f, 0.0f);
-			clip.cols[2] = math::simd_float4::Load(0.0f, 0.0f, 0.5f, 0.0f);
-			clip.cols[3] = math::simd_float4::Load(0.0f, 0.0f, 0.5f, 1.0f);
-
-			update_data.ubo.proj.cols[2] = update_data.ubo.proj.cols[2] * math::simd_float4::Load(0.f, 0.f, -1.f, -1.f);
-			update_data.ubo.proj = clip * update_data.ubo.proj;
-		}
-
-		//update_data.ubo.view = math::Float4x4::Translation(math::simd_float4::Load(3.f, 5.f, 10.f, 1.f));
+		update_data.ubo.view = getCorrectedView(camera_->view());
+		update_data.ubo.proj = getCorrectedProjection(camera_->projection());
 
 		// Trigger uniform buffer update
 		update_data.flags |= vk::ModelRenderState::UpdateData::UDF_UNIFORM_BUFFER;
