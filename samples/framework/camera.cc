@@ -257,18 +257,6 @@ void Camera::Resize(int _width, int _height) {
   projection_.cols[2] = math::simd_float4::Load(0.f, 0.f, -(kFar + kNear) / (kFar - kNear), -1.f);
   projection_.cols[3] = math::simd_float4::Load(0.f, 0.f, -(2.f * kFar * kNear) / (kFar - kNear), 0.f);
 
-#ifdef OZZ_FRAMEWORK_VULKAN_RENDERER
-  ozz::math::Float4x4 clip;
-  clip.cols[0] = math::simd_float4::Load(1.0f,  0.0f, 0.0f, 0.0f);
-  clip.cols[1] = math::simd_float4::Load(0.0f, -1.0f, 0.0f, 0.0f);
-  clip.cols[2] = math::simd_float4::Load(0.0f,  0.0f, 0.5f, 0.0f);
-  clip.cols[3] = math::simd_float4::Load(0.0f,  0.0f, 0.5f, 1.0f);
-
-  projection_.cols[2] = projection_.cols[2] * math::simd_float4::Load(0.f, 0.f, -1.f, -1.f);
-
-  projection_ = clip * projection_;
-#endif
-
   // Computes the 2D projection matrix.
   projection_2d_.cols[0] = math::simd_float4::Load(2.f / _width, 0.f, 0.f, 0.f);
   projection_2d_.cols[1] = math::simd_float4::Load(0.f, 2.f / _height, 0.f, 0.f);

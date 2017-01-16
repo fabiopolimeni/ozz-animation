@@ -24,6 +24,6 @@ out gl_PerVertex {
 void main() {
     gl_Position = ubo.proj * ubo.view * ubo.model * inTransform * vec4(inPosition, 1.0);
 
-    outColor = inColor;
+    outColor = inNormal;
     outTexCoord = inTexCoord;
 }

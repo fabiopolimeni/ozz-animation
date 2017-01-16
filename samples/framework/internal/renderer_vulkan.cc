@@ -98,14 +98,14 @@ bool ozz::sample::internal::RendererVulkan::DrawBoxShaded(const ozz::math::Box &
 	// If a shaded box render state doesn't exist yet, create one
 	if (!rs_shaded_boxes_) {
 		const math::Float3 pos[8] = {
-			math::Float3(_box.min.x, _box.min.y, 12.f + _box.min.z),
-			math::Float3(_box.max.x, _box.min.y, 12.f + _box.min.z),
-			math::Float3(_box.max.x, _box.max.y, 12.f + _box.min.z),
-			math::Float3(_box.min.x, _box.max.y, 12.f + _box.min.z),
-			math::Float3(_box.min.x, _box.min.y, 12.f + _box.max.z),
-			math::Float3(_box.max.x, _box.min.y, 12.f + _box.max.z),
-			math::Float3(_box.max.x, _box.max.y, 12.f + _box.max.z),
-			math::Float3(_box.min.x, _box.max.y, 12.f + _box.max.z)
+			math::Float3(_box.min.x, _box.min.y, _box.min.z),
+			math::Float3(_box.max.x, _box.min.y, _box.min.z),
+			math::Float3(_box.max.x, _box.max.y, _box.min.z),
+			math::Float3(_box.min.x, _box.max.y, _box.min.z),
+			math::Float3(_box.min.x, _box.min.y, _box.max.z),
+			math::Float3(_box.max.x, _box.min.y, _box.max.z),
+			math::Float3(_box.max.x, _box.max.y, _box.max.z),
+			math::Float3(_box.min.x, _box.max.y, _box.max.z)
 		};
 
 		const math::Float3 normals[6] = {
@@ -189,15 +189,19 @@ bool ozz::sample::internal::RendererVulkan::DrawBoxShaded(const ozz::math::Box &
 	vk::ModelRenderState::UpdateData update_data;
 	update_data.flags = vk::ModelRenderState::UpdateData::UDF_NONE;
 
-	// Update instances buffer
+	// Update instance buffer
 	{
 		const auto numOfInstances = _transforms.Count();
 		update_data.ibo.transforms.resize(numOfInstances);
 		for (auto iIt = 0; iIt < numOfInstances; ++iIt) {
-			update_data.ibo.transforms[iIt] =  math::Float4x4::identity();  //_transforms[iIt];
+			const auto& model = _transforms[iIt];
+			auto& instance = update_data.ibo.transforms[iIt];
+
+			instance = _transforms[iIt];
+			instance.cols[3] = model.cols[3] * math::simd_float4::Load(-1.f, 1.f, 1.f, 1.f);
 		}
 
-		// Update the instance buffer
+		// Trigger instance buffer update
 		update_data.flags |= vk::ModelRenderState::UpdateData::UDF_INSTANCE_BUFFER;
 	}
 
@@ -205,10 +209,32 @@ bool ozz::sample::internal::RendererVulkan::DrawBoxShaded(const ozz::math::Box &
 	{
 		// Uniform data
 		update_data.ubo.model = math::Float4x4::identity();
-		update_data.ubo.view = math::Float4x4::identity();// camera_->view();
+		update_data.ubo.view = camera_->view();
 		update_data.ubo.proj = camera_->projection();
 
-		// Update the uniform buffer
+		// Correct view matrix
+		{
+			update_data.ubo.view.cols[0] = update_data.ubo.view.cols[0] * math::simd_float4::Load(-1.f, -1.f, 1.f, 1.f);
+			update_data.ubo.view.cols[1] = update_data.ubo.view.cols[1] * math::simd_float4::Load(1.f, 1.f, -1.f, 1.f);
+			update_data.ubo.view.cols[2] = update_data.ubo.view.cols[2] * math::simd_float4::Load(1.f, 1.f, -1.f, 1.f);
+			update_data.ubo.view.cols[3] = update_data.ubo.view.cols[3] * math::simd_float4::Load(1.f, 1.f, -1.f, 1.f);
+		}
+
+		// Correct projection matrix
+		{
+			ozz::math::Float4x4 clip;
+			clip.cols[0] = math::simd_float4::Load(1.0f, 0.0f, 0.0f, 0.0f);
+			clip.cols[1] = math::simd_float4::Load(0.0f, -1.0f, 0.0f, 0.0f);
+			clip.cols[2] = math::simd_float4::Load(0.0f, 0.0f, 0.5f, 0.0f);
+			clip.cols[3] = math::simd_float4::Load(0.0f, 0.0f, 0.5f, 1.0f);
+
+			update_data.ubo.proj.cols[2] = update_data.ubo.proj.cols[2] * math::simd_float4::Load(0.f, 0.f, -1.f, -1.f);
+			update_data.ubo.proj = clip * update_data.ubo.proj;
+		}
+
+		//update_data.ubo.view = math::Float4x4::Translation(math::simd_float4::Load(3.f, 5.f, 10.f, 1.f));
+
+		// Trigger uniform buffer update
 		update_data.flags |= vk::ModelRenderState::UpdateData::UDF_UNIFORM_BUFFER;
 	}
 

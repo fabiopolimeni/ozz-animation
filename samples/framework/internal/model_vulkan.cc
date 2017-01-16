@@ -603,6 +603,8 @@ void ozz::sample::vk::ModelRenderState::setupDeleterPtrs() {
 	vertexBufferMemory = { renderContext->device, vkFreeMemory };
 	indexBuffer = { renderContext->device, vkDestroyBuffer };
 	indexBufferMemory = { renderContext->device, vkFreeMemory };
+	instanceBuffer = { renderContext->device, vkDestroyBuffer };
+	instanceBufferMemory = { renderContext->device, vkFreeMemory };
 	uniformStagingBuffer = { renderContext->device, vkDestroyBuffer };
 	uniformStagingBufferMemory = { renderContext->device, vkFreeMemory };
 	uniformBuffer = { renderContext->device, vkDestroyBuffer };
@@ -637,7 +639,7 @@ bool ozz::sample::vk::ModelRenderState::onRegisterRenderPass(size_t commandIndex
 	vkCmdBindIndexBuffer(commandBuffer, indexBuffer, 0, VK_INDEX_TYPE_UINT32);
 	vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSet, 0, nullptr);
 	vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
-	vkCmdDrawIndexed(commandBuffer, numOfIndices, 1, 0, 0, 0);
+	vkCmdDrawIndexed(commandBuffer, numOfIndices, numOfInstances, 0, 0, 0);
 
 	return true;
 }
