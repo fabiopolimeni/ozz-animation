@@ -45,6 +45,9 @@
 #pragma warning(disable: 4100)
 
 namespace {
+
+	// Following code based on http://answers.unity3d.com/storage/temp/12048-lefthandedtorighthanded.pdf
+
 	static ozz::math::Float4x4 getCorrectedModel(const ozz::math::Float4x4 model) {
 		ozz::math::Float4x4 model_matrix = model;
 		
