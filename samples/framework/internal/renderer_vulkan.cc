@@ -82,12 +82,14 @@ namespace {
 ozz::sample::internal::RendererVulkan::RendererVulkan(Camera * _camera)
 	: ozz::sample::Renderer(), camera_(_camera)
 	, rs_shaded_boxes_(nullptr)
+	, rs_line_batcher_(nullptr)
 {
 }
 
 ozz::sample::internal::RendererVulkan::~RendererVulkan()
 {
 	context_->destroyRenderState(rs_shaded_boxes_);
+	context_->destroyRenderState(rs_line_batcher_);
 
 	context_->shutdown();
 	memory::default_allocator()->Delete(context_);
@@ -107,6 +109,34 @@ void ozz::sample::internal::RendererVulkan::OnResize(int32_t _width, int32_t _he
 
 void ozz::sample::internal::RendererVulkan::DrawAxes(const ozz::math::Float4x4 & _transform)
 {
+	if (!rs_line_batcher_) {
+		rs_line_batcher_ = context_->createRenderState<vk::LineRenderState>();
+		CHECK_AND_REPORT(rs_line_batcher_, "Line-batcher render-state can't be created!");
+	}
+
+	// X axis (red).
+	rs_line_batcher_->add(
+		ozz::math::Float3(0, 0 ,0),
+		ozz::math::Float3(1, 0, 0),
+		{0xff, 0x00, 0x00, 0xff},
+		getCorrectedModel(_transform)
+	);
+
+	// Y axis (green).
+	rs_line_batcher_->add(
+		ozz::math::Float3(0, 0, 0),
+		ozz::math::Float3(0, 1, 0),
+		{ 0x00, 0xff, 0x00, 0xff },
+		getCorrectedModel(_transform)
+	);
+
+	// Z axis (blue).
+	rs_line_batcher_->add(
+		ozz::math::Float3(0, 0, 0),
+		ozz::math::Float3(0, 0, 1),
+		{ 0x00, 0x00, 0xff, 0xff },
+		getCorrectedModel(_transform)
+	);
 }
 
 void ozz::sample::internal::RendererVulkan::DrawGrid(int _cell_count, float _cell_size)
@@ -273,6 +303,15 @@ bool ozz::sample::internal::RendererVulkan::DrawBinormals(ozz::Range<const float
 
 bool ozz::sample::internal::RendererVulkan::RenderFrame()
 {
+	// Update line batcher uniform data
+	{
+		vk::LineRenderState::UpdateData line_batcher_update_data;
+		line_batcher_update_data.ubo.proj = getCorrectedProjection(camera_->projection());
+		line_batcher_update_data.ubo.view = getCorrectedView(camera_->view());
+		line_batcher_update_data.flags = vk::LineRenderState::UpdateData::UDF_UNIFORM_BUFFER;
+		rs_line_batcher_->submit(line_batcher_update_data);
+	}
+
 	return context_->drawFrame();
 }
 

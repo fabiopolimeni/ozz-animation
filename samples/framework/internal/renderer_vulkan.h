@@ -55,6 +55,7 @@ namespace ozz {
 		namespace vk {
 			class RenderState;
 			class ModelRenderState;
+			class LineRenderState;
 		}
 
 		namespace internal {
@@ -154,6 +155,9 @@ namespace ozz {
 
 				// Shaded box render state
 				vk::ModelRenderState* rs_shaded_boxes_;
+
+				// Line batcher render state
+				vk::LineRenderState* rs_line_batcher_;
 
 			};
 		}  // internal
