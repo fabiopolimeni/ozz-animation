@@ -142,7 +142,7 @@ namespace ozz {
 				VkDescriptorSet descriptorSet;
 
 				std::array<VkVertexInputBindingDescription, 2> getVertexBindingDescriptions();
-				std::array<VkVertexInputAttributeDescription, 5> getVertexAttributeDescriptions();
+				std::array<VkVertexInputAttributeDescription, 8> getVertexAttributeDescriptions();
 
 				void setupDeleterPtrs();
 

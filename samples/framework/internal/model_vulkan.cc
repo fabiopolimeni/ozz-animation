@@ -32,13 +32,13 @@
 
 std::array<VkVertexInputBindingDescription, 2> ozz::sample::vk::ModelRenderState::getVertexBindingDescriptions() {
 	VkVertexInputBindingDescription geometryBindingDesc = { 0, sizeof(ozz::sample::vk::ModelRenderState::Vertex), VK_VERTEX_INPUT_RATE_VERTEX };
-	VkVertexInputBindingDescription instanceBindingDesc = { 0, sizeof(ozz::math::Float4x4), VK_VERTEX_INPUT_RATE_INSTANCE };
+	VkVertexInputBindingDescription instanceBindingDesc = { 1, sizeof(ozz::math::Float4x4), VK_VERTEX_INPUT_RATE_INSTANCE };
 
 	return { geometryBindingDesc, instanceBindingDesc };
 }
 
-std::array<VkVertexInputAttributeDescription, 5> ozz::sample::vk::ModelRenderState::getVertexAttributeDescriptions() {
-	std::array<VkVertexInputAttributeDescription, 5> attributeDescriptions = {};
+std::array<VkVertexInputAttributeDescription, 8> ozz::sample::vk::ModelRenderState::getVertexAttributeDescriptions() {
+	std::array<VkVertexInputAttributeDescription, 8> attributeDescriptions = {};
 
 	// Geometry
 	attributeDescriptions[0].binding = 0;
@@ -62,10 +62,25 @@ std::array<VkVertexInputAttributeDescription, 5> ozz::sample::vk::ModelRenderSta
 	attributeDescriptions[3].offset = offsetof(Vertex, color);
 
 	// Instance
-	attributeDescriptions[3].binding = 0;
-	attributeDescriptions[3].location = 4;
-	attributeDescriptions[3].format = VK_FORMAT_R32G32B32A32_SFLOAT;
-	attributeDescriptions[3].offset = 0;
+	attributeDescriptions[4].binding = 1;
+	attributeDescriptions[4].location = 4;
+	attributeDescriptions[4].format = VK_FORMAT_R32G32B32A32_SFLOAT;
+	attributeDescriptions[4].offset = offsetof(math::Float4x4, cols[0]);
+
+	attributeDescriptions[5].binding = 1;
+	attributeDescriptions[5].location = 5;
+	attributeDescriptions[5].format = VK_FORMAT_R32G32B32A32_SFLOAT;
+	attributeDescriptions[5].offset = offsetof(math::Float4x4, cols[1]);
+
+	attributeDescriptions[6].binding = 1;
+	attributeDescriptions[6].location = 6;
+	attributeDescriptions[6].format = VK_FORMAT_R32G32B32A32_SFLOAT;
+	attributeDescriptions[6].offset = offsetof(math::Float4x4, cols[2]);
+
+	attributeDescriptions[7].binding = 1;
+	attributeDescriptions[7].location = 7;
+	attributeDescriptions[7].format = VK_FORMAT_R32G32B32A32_SFLOAT;
+	attributeDescriptions[7].offset = offsetof(math::Float4x4, cols[3]);
 
 	return attributeDescriptions;
 }
@@ -298,7 +313,7 @@ void ozz::sample::vk::ModelRenderState::createInstanceBuffer(const std::vector<o
 	// Store the number of instances, that is, we can decide
 	// later whether or not a buffer update requires to
 	// re-create the instance-buffer.
-	numOfIndices = static_cast<uint32_t>(transforms.size());
+	numOfInstances = static_cast<uint32_t>(transforms.size());
 	createBuffer(renderContext->physicalDevice, renderContext->device, bufferSize,
 		VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, instanceBuffer, instanceBufferMemory);
@@ -618,7 +633,7 @@ bool ozz::sample::vk::ModelRenderState::onRegisterRenderPass(size_t commandIndex
 	
 	VkDeviceSize offsets[] = { 0 };
 	vkCmdBindVertexBuffers(commandBuffer, 0, 1, &vertexBuffer, offsets);
-	vkCmdBindVertexBuffers(commandBuffer, 0, 1, &instanceBuffer, offsets);
+	vkCmdBindVertexBuffers(commandBuffer, 1, 1, &instanceBuffer, offsets);
 	vkCmdBindIndexBuffer(commandBuffer, indexBuffer, 0, VK_INDEX_TYPE_UINT32);
 	vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSet, 0, nullptr);
 	vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
