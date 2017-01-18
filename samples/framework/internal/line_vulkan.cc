@@ -58,60 +58,307 @@ std::array<VkVertexInputAttributeDescription, 2> ozz::sample::vk::LineRenderStat
 
 void ozz::sample::vk::LineRenderState::setupDeleterPtrs()
 {
-
+	descriptorSetLayout = { renderContext->device, vkDestroyDescriptorSetLayout };
+	pipelineLayout = { renderContext->device, vkDestroyPipelineLayout };
+	graphicsPipeline = { renderContext->device, vkDestroyPipeline };
+	vertexBuffer = { renderContext->device, vkDestroyBuffer };
+	vertexBufferMemory = { renderContext->device, vkFreeMemory };
+	uniformStagingBuffer = { renderContext->device, vkDestroyBuffer };
+	uniformStagingBufferMemory = { renderContext->device, vkFreeMemory };
+	uniformBuffer = { renderContext->device, vkDestroyBuffer };
+	uniformBufferMemory = { renderContext->device, vkFreeMemory };
+	descriptorPool = { renderContext->device, vkDestroyDescriptorPool };
 }
 
 void ozz::sample::vk::LineRenderState::createDescriptorSetLayout()
 {
+	VkDescriptorSetLayoutBinding uboLayoutBinding = {};
+	uboLayoutBinding.binding = 0;
+	uboLayoutBinding.descriptorCount = 1;
+	uboLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+	uboLayoutBinding.pImmutableSamplers = nullptr;
+	uboLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 
+	std::array<VkDescriptorSetLayoutBinding, 1> bindings = { uboLayoutBinding };
+	VkDescriptorSetLayoutCreateInfo layoutInfo = {};
+	layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+	layoutInfo.bindingCount = static_cast<uint32_t>(bindings.size());
+	layoutInfo.pBindings = bindings.data();
+
+	CHECK_VK_RESULT(vkCreateDescriptorSetLayout(renderContext->device, &layoutInfo, nullptr, descriptorSetLayout.replace()));
 }
 
 void ozz::sample::vk::LineRenderState::createGraphicsPipeline()
 {
+	std::vector<char> vertShaderCode;
+	std::vector<char> fragShaderCode;
+	bool validShaders = vk::readFile("../shaders/line_vert.spv", vertShaderCode)
+		&& vk::readFile("../shaders/line_frag.spv", fragShaderCode);
 
+	CHECK_AND_REPORT(validShaders, "Failed to load shader code. The graphics pipeline cannot be created");
+
+	deleter_ptr<VkShaderModule> vertShaderModule{ renderContext->device, vkDestroyShaderModule };
+	deleter_ptr<VkShaderModule> fragShaderModule{ renderContext->device, vkDestroyShaderModule };
+	createShaderModule(renderContext->device, vertShaderCode, vertShaderModule);
+	createShaderModule(renderContext->device, fragShaderCode, fragShaderModule);
+
+	VkPipelineShaderStageCreateInfo vertShaderStageInfo = {};
+	vertShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+	vertShaderStageInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
+	vertShaderStageInfo.module = vertShaderModule;
+	vertShaderStageInfo.pName = "main";
+
+	VkPipelineShaderStageCreateInfo fragShaderStageInfo = {};
+	fragShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+	fragShaderStageInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+	fragShaderStageInfo.module = fragShaderModule;
+	fragShaderStageInfo.pName = "main";
+
+	VkPipelineShaderStageCreateInfo shaderStages[] = { vertShaderStageInfo, fragShaderStageInfo };
+
+	VkPipelineVertexInputStateCreateInfo vertexInputInfo = {};
+	vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+
+	auto bindingDescriptions = getVertexBindingDescriptions();
+	auto attributeDescriptions = getVertexAttributeDescriptions();
+
+	vertexInputInfo.vertexBindingDescriptionCount = static_cast<uint32_t>(bindingDescriptions.size());;
+	vertexInputInfo.vertexAttributeDescriptionCount = static_cast<uint32_t>(attributeDescriptions.size());
+	vertexInputInfo.pVertexBindingDescriptions = bindingDescriptions.data();
+	vertexInputInfo.pVertexAttributeDescriptions = attributeDescriptions.data();
+
+	VkPipelineInputAssemblyStateCreateInfo inputAssembly = {};
+	inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+	inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_LINE_LIST;
+	inputAssembly.primitiveRestartEnable = VK_FALSE;
+
+	VkViewport viewport = {};
+	viewport.x = 0.0f;
+	viewport.y = 0.0f;
+	viewport.width = (float)renderContext->swapChainExtent.width;
+	viewport.height = (float)renderContext->swapChainExtent.height;
+	viewport.minDepth = 0.0f;
+	viewport.maxDepth = 1.0f;
+
+	VkRect2D scissor = {};
+	scissor.offset = { 0, 0 };
+	scissor.extent = renderContext->swapChainExtent;
+
+	VkPipelineViewportStateCreateInfo viewportState = {};
+	viewportState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
+	viewportState.viewportCount = 1;
+	viewportState.pViewports = &viewport;
+	viewportState.scissorCount = 1;
+	viewportState.pScissors = &scissor;
+
+	VkPipelineRasterizationStateCreateInfo rasterizer = {};
+	rasterizer.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+	rasterizer.depthClampEnable = VK_FALSE;
+	rasterizer.rasterizerDiscardEnable = VK_FALSE;
+	rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
+	rasterizer.lineWidth = 1.0f;
+	rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
+	rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+	rasterizer.depthBiasEnable = VK_FALSE;
+
+	VkPipelineMultisampleStateCreateInfo multisampling = {};
+	multisampling.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+	multisampling.sampleShadingEnable = VK_FALSE;
+	multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+
+	VkPipelineDepthStencilStateCreateInfo depthStencil = {};
+	depthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+	depthStencil.depthTestEnable = VK_TRUE;
+	depthStencil.depthWriteEnable = VK_FALSE;
+	depthStencil.depthCompareOp = VK_COMPARE_OP_LESS;
+	depthStencil.depthBoundsTestEnable = VK_FALSE;
+	depthStencil.stencilTestEnable = VK_FALSE;
+
+	VkPipelineColorBlendAttachmentState colorBlendAttachment = {};
+	colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+	colorBlendAttachment.blendEnable = VK_FALSE;
+
+	VkPipelineColorBlendStateCreateInfo colorBlending = {};
+	colorBlending.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+	colorBlending.logicOpEnable = VK_FALSE;
+	colorBlending.logicOp = VK_LOGIC_OP_COPY;
+	colorBlending.attachmentCount = 1;
+	colorBlending.pAttachments = &colorBlendAttachment;
+	colorBlending.blendConstants[0] = 0.0f;
+	colorBlending.blendConstants[1] = 0.0f;
+	colorBlending.blendConstants[2] = 0.0f;
+	colorBlending.blendConstants[3] = 0.0f;
+
+	VkDescriptorSetLayout setLayouts[] = { descriptorSetLayout };
+	VkPipelineLayoutCreateInfo pipelineLayoutInfo = {};
+	pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+	pipelineLayoutInfo.setLayoutCount = 1;
+	pipelineLayoutInfo.pSetLayouts = setLayouts;
+
+	CHECK_VK_RESULT(vkCreatePipelineLayout(renderContext->device, &pipelineLayoutInfo, nullptr, pipelineLayout.replace()));
+
+	VkGraphicsPipelineCreateInfo pipelineInfo = {};
+	pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+	pipelineInfo.stageCount = 2;
+	pipelineInfo.pStages = shaderStages;
+	pipelineInfo.pVertexInputState = &vertexInputInfo;
+	pipelineInfo.pInputAssemblyState = &inputAssembly;
+	pipelineInfo.pViewportState = &viewportState;
+	pipelineInfo.pRasterizationState = &rasterizer;
+	pipelineInfo.pMultisampleState = &multisampling;
+	pipelineInfo.pDepthStencilState = &depthStencil;
+	pipelineInfo.pColorBlendState = &colorBlending;
+	pipelineInfo.layout = pipelineLayout;
+	pipelineInfo.renderPass = renderContext->renderPass;
+	pipelineInfo.subpass = 0;
+	pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
+
+	CHECK_VK_RESULT(vkCreateGraphicsPipelines(renderContext->device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, graphicsPipeline.replace()));
+	setDirty(true);
 }
 
 void ozz::sample::vk::LineRenderState::createUniformBuffer()
 {
+	VkDeviceSize bufferSize = sizeof(UniformBufferObject);
 
+	createBuffer(renderContext->physicalDevice, renderContext->device, bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, uniformStagingBuffer, uniformStagingBufferMemory);
+	createBuffer(renderContext->physicalDevice, renderContext->device, bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, uniformBuffer, uniformBufferMemory);
+	
+	setDirty(true);
 }
 
 void ozz::sample::vk::LineRenderState::createDescriptorPool()
 {
+	std::array<VkDescriptorPoolSize, 2> poolSizes = {};
+	poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+	poolSizes[0].descriptorCount = 1;
+	poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	poolSizes[1].descriptorCount = 1;
 
+	VkDescriptorPoolCreateInfo poolInfo = {};
+	poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+	poolInfo.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
+	poolInfo.pPoolSizes = poolSizes.data();
+	poolInfo.maxSets = 1;
+
+	CHECK_VK_RESULT(vkCreateDescriptorPool(renderContext->device, &poolInfo, nullptr, descriptorPool.replace()));
 }
 
-void ozz::sample::vk::LineRenderState::createVertexBuffer(const std::vector<Vertex>& /*vertices*/)
+void ozz::sample::vk::LineRenderState::createVertexBuffer(const std::vector<Vertex>& vertices)
 {
+	VkDeviceSize bufferSize = sizeof(vertices[0]) * vertices.size();
 
+	// Store the number of vertices, that is, we can decide
+	// later whether or not a buffer update requires to
+	// re-create the vertex-buffer.
+	numOfVertices = static_cast<uint32_t>(vertices.size());
+	createBuffer(renderContext->physicalDevice, renderContext->device, bufferSize,
+		VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, vertexBuffer, vertexBufferMemory);
+
+	updateVertexBuffer(vertices);
+	setDirty(true);
 }
 
 void ozz::sample::vk::LineRenderState::createDescriptorSet()
 {
+	VkDescriptorSetLayout layouts[] = { descriptorSetLayout };
+	VkDescriptorSetAllocateInfo allocInfo = {};
+	allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+	allocInfo.descriptorPool = descriptorPool;
+	allocInfo.descriptorSetCount = 1;
+	allocInfo.pSetLayouts = layouts;
 
+	CHECK_VK_RESULT(vkAllocateDescriptorSets(renderContext->device, &allocInfo, &descriptorSet));
+
+	VkDescriptorBufferInfo bufferInfo = {};
+	bufferInfo.buffer = uniformBuffer;
+	bufferInfo.offset = 0;
+	bufferInfo.range = sizeof(UniformBufferObject);
+
+	std::array<VkWriteDescriptorSet, 1> descriptorWrites = {};
+
+	descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	descriptorWrites[0].dstSet = descriptorSet;
+	descriptorWrites[0].dstBinding = 0;
+	descriptorWrites[0].dstArrayElement = 0;
+	descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+	descriptorWrites[0].descriptorCount = 1;
+	descriptorWrites[0].pBufferInfo = &bufferInfo;
+
+	vkUpdateDescriptorSets(renderContext->device, static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
+	setDirty(true);
 }
 
-void ozz::sample::vk::LineRenderState::updateVertexBuffer(const std::vector<Vertex>& /*vertices*/)
+void ozz::sample::vk::LineRenderState::updateVertexBuffer(const std::vector<Vertex>& vertices)
 {
+	CHECK_AND_REPORT(vertexBuffer && vertexBufferMemory, "vertexBuffer and vertexBufferMemory have to be valid handles");
+	CHECK_AND_REPORT(vertices.size() == numOfVertices, "To update the vertex buffer, the number of vertices have to match");
 
+	VkDeviceSize bufferSize = sizeof(vertices[0]) * vertices.size();
+	deleter_ptr<VkBuffer> stagingBuffer{ renderContext->device, vkDestroyBuffer };
+	deleter_ptr<VkDeviceMemory> stagingBufferMemory{ renderContext->device, vkFreeMemory };
+	createBuffer(renderContext->physicalDevice, renderContext->device, bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
+
+	void* data;
+	vkMapMemory(renderContext->device, stagingBufferMemory, 0, bufferSize, 0, &data);
+	{
+		memcpy(data, vertices.data(), (size_t)bufferSize);
+		vkUnmapMemory(renderContext->device, stagingBufferMemory);
+	}
+
+	VkCommandBuffer commandBuffer = beginSingleTimeCommand(renderContext->device, renderContext->commandPool);
+	{
+		copyBuffer(stagingBuffer, vertexBuffer, bufferSize, commandBuffer);
+		endSingleTimeCommand(renderContext->device, renderContext->graphicsQueue, renderContext->commandPool, commandBuffer);
+	}
 }
 
-bool ozz::sample::vk::LineRenderState::updateGeometryBufferObject(const GeometryBuffersObject& /*gbo*/)
+void ozz::sample::vk::LineRenderState::updateGeometryBufferObject()
 {
-	return true;
+	CHECK_AND_REPORT(gbo.vertices.size(), "Vertex buffer needs to contain valid data");
+	if (gbo.vertices.size() != numOfVertices) {
+		createVertexBuffer(gbo.vertices);
+	}
+	else {
+		updateVertexBuffer(gbo.vertices);
+	}
+
+	// Once the geometry buffer has been updated, we need to
+	// clear its content, otherwise we would increment the
+	// number of vertices infinitely.
+	gbo.vertices.clear();
 }
 
-bool ozz::sample::vk::LineRenderState::updateUniformBufferObject(const UniformBufferObject& /*ubo*/)
+bool ozz::sample::vk::LineRenderState::updateUniformBufferObject(const UniformBufferObject& ubo)
 {
-	return true;
+	void* data;
+	vkMapMemory(renderContext->device, uniformStagingBufferMemory, 0, sizeof(ubo), 0, &data);
+	{
+		memcpy(data, &ubo, sizeof(ubo));
+		vkUnmapMemory(renderContext->device, uniformStagingBufferMemory);
+	}
+
+	VkCommandBuffer commandBuffer = beginSingleTimeCommand(renderContext->device, renderContext->commandPool);
+	{
+		copyBuffer(uniformStagingBuffer, uniformBuffer, sizeof(ubo), commandBuffer);
+		endSingleTimeCommand(renderContext->device, renderContext->graphicsQueue, renderContext->commandPool, commandBuffer);
+	}
+
+	// NOTE: Can't change the uniform buffer size at runtime
+	return false;
 }
 
-void ozz::sample::vk::LineRenderState::setDirty(bool /*bDirty*/)
+void ozz::sample::vk::LineRenderState::setDirty(bool bDirty)
 {
-
+	dirty = bDirty;
 }
 
 ozz::sample::vk::LineRenderState::LineRenderState()
+	: numOfVertices(0), dirty(false)
 {
 
 }
@@ -121,43 +368,99 @@ ozz::sample::vk::LineRenderState::~LineRenderState()
 
 }
 
-bool ozz::sample::vk::LineRenderState::onInitResources(internal::ContextVulkan* /*context*/)
+bool ozz::sample::vk::LineRenderState::onInitResources(internal::ContextVulkan* context)
 {
-	return true;
+	if (RenderState::onInitResources(context)) {
+		setupDeleterPtrs();
+
+		createDescriptorSetLayout();
+		createGraphicsPipeline();
+		createUniformBuffer();
+		createDescriptorPool();
+		return true;
+	}
+
+	return false;
 }
 
 void ozz::sample::vk::LineRenderState::onReleaseResources()
 {
-
+	RenderState::onReleaseResources();
 }
 
-bool ozz::sample::vk::LineRenderState::onRegisterRenderPass(size_t /*commandIndex*/)
+bool ozz::sample::vk::LineRenderState::onRegisterRenderPass(size_t commandIndex)
 {
+	VkCommandBuffer commandBuffer = renderContext->commandBuffers[commandIndex];
+
+	VkDeviceSize offsets[] = { 0 };
+	vkCmdBindVertexBuffers(commandBuffer, 0, 1, &vertexBuffer, offsets);
+	vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSet, 0, nullptr);
+	vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
+	vkCmdDraw(commandBuffer, numOfVertices, 1, 0, 0);
+
 	return true;
 }
 
 void ozz::sample::vk::LineRenderState::onRenderPassesComplete()
 {
-
+	setDirty(false);
 }
 
 bool ozz::sample::vk::LineRenderState::onSwapChainChange()
 {
+	createGraphicsPipeline();
 	return true;
 }
 
 bool ozz::sample::vk::LineRenderState::isDirty()
 {
+	return dirty;
+}
+
+bool ozz::sample::vk::LineRenderState::add(
+	ozz::math::Float3 p0, ozz::math::Float3 p1,
+	Renderer::Color color, ozz::math::Float4x4 transform)
+{
+	alignas(16) float p_s[4] = { 0 };
+	alignas(16) float p_e[4] = { 0 };
+
+	auto v0 = ozz::math::TransformPoint(
+		transform, ozz::math::simd_float4::Load(p0.x, p0.y, p0.z, 1.f));
+	
+	ozz::math::StorePtrU(v0, p_s);
+
+	auto v1 = ozz::math::TransformPoint(
+		transform, ozz::math::simd_float4::Load(p1.x, p1.y, p1.z, 1.f));
+
+	ozz::math::StorePtrU(v1, p_e);
+
+	gbo.vertices.emplace_back(Vertex{
+		math::Float3(p_s[0], p_s[1], p_s[2]),
+		color
+	});
+
+	gbo.vertices.emplace_back(Vertex{
+		math::Float3(p_e[0], p_e[1], p_e[2]),
+		color
+	});
+
 	return true;
 }
 
-bool ozz::sample::vk::LineRenderState::add(ozz::math::Float3 /*p0*/, ozz::math::Float3 /*p1*/,
-	Renderer::Color /*color*/, ozz::math::Float4x4 /*transform*/)
+bool ozz::sample::vk::LineRenderState::submit(const UpdateData& updateData)
 {
-	return true;
-}
+	// We have stored all the lines into the geometry buffer,
+	// we now transfer the memory to that buffer on the GPU,
+	// if it differs in size, since last time, it will be
+	// re-created to accommodate the right amount of elements.
+	updateGeometryBufferObject();
 
-bool ozz::sample::vk::LineRenderState::submit(const UpdateData& /*updateData*/)
-{
+	// Uniform buffer
+	if (updateData.flags & (UpdateData::UDF_UNIFORM_BUFFER)) {
+		if (updateUniformBufferObject(updateData.ubo) || descriptorSet == VK_NULL_HANDLE) {
+			createDescriptorSet();
+		}
+	}
+
 	return true;
 }

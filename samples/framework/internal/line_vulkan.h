@@ -77,6 +77,8 @@ namespace ozz {
 					std::vector<Vertex>		vertices;	// Vertex buffer
 				};
 
+				GeometryBuffersObject gbo;
+
 				// Store the minimum information needed to determine
 				// whether a buffer needs to be re-instantiated or not.
 				uint32_t numOfVertices;
@@ -95,7 +97,7 @@ namespace ozz {
 				vk::deleter_ptr<VkDeviceMemory> uniformBufferMemory;
 
 				vk::deleter_ptr<VkDescriptorPool> descriptorPool;
-				VkDescriptorSet descriptorSet;
+				VkDescriptorSet descriptorSet = VK_NULL_HANDLE;
 
 				std::array<VkVertexInputBindingDescription, 1> getVertexBindingDescriptions();
 				std::array<VkVertexInputAttributeDescription, 2> getVertexAttributeDescriptions();
@@ -112,9 +114,10 @@ namespace ozz {
 
 				void updateVertexBuffer(const std::vector<Vertex>& vertices);
 				
-				// These series of function return whether or not the respective
+				void updateGeometryBufferObject();
+				
+				// These series of functions return whether or not the respective
 				// buffer needed to be re-created as a result of the update.
-				bool updateGeometryBufferObject(const GeometryBuffersObject& gbo);
 				bool updateUniformBufferObject(const UniformBufferObject& ubo);
 
 				void setDirty(bool bDirty);

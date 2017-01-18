@@ -48,6 +48,9 @@ namespace ozz {
 		namespace vk {
 			class RenderState;
 			class ModelRenderState;
+			class LineRenderState;
+			class SkeletonlRenderState;
+			class MeshRenderState;
 		}
 
 		namespace internal {
@@ -63,6 +66,9 @@ namespace ozz {
 
 				friend class vk::RenderState;
 				friend class vk::ModelRenderState;
+				friend class vk::LineRenderState;
+				friend class vk::SkeletonlRenderState;
+				friend class vk::MeshRenderState;
 
 				vk::deleter_ptr<VkInstance> instance{ vkDestroyInstance };
 				vk::deleter_ptr<VkDebugReportCallbackEXT> callback{ instance, DestroyDebugReportCallbackEXT };

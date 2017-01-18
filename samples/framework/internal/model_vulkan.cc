@@ -65,22 +65,22 @@ std::array<VkVertexInputAttributeDescription, 8> ozz::sample::vk::ModelRenderSta
 	attributeDescriptions[4].binding = 1;
 	attributeDescriptions[4].location = 4;
 	attributeDescriptions[4].format = VK_FORMAT_R32G32B32A32_SFLOAT;
-	attributeDescriptions[4].offset = offsetof(math::Float4x4, cols[0]);
+	attributeDescriptions[4].offset = (uint32_t)offsetof(math::Float4x4, cols[0]);
 
 	attributeDescriptions[5].binding = 1;
 	attributeDescriptions[5].location = 5;
 	attributeDescriptions[5].format = VK_FORMAT_R32G32B32A32_SFLOAT;
-	attributeDescriptions[5].offset = offsetof(math::Float4x4, cols[1]);
+	attributeDescriptions[5].offset = (uint32_t)offsetof(math::Float4x4, cols[1]);
 
 	attributeDescriptions[6].binding = 1;
 	attributeDescriptions[6].location = 6;
 	attributeDescriptions[6].format = VK_FORMAT_R32G32B32A32_SFLOAT;
-	attributeDescriptions[6].offset = offsetof(math::Float4x4, cols[2]);
+	attributeDescriptions[6].offset = (uint32_t)offsetof(math::Float4x4, cols[2]);
 
 	attributeDescriptions[7].binding = 1;
 	attributeDescriptions[7].location = 7;
 	attributeDescriptions[7].format = VK_FORMAT_R32G32B32A32_SFLOAT;
-	attributeDescriptions[7].offset = offsetof(math::Float4x4, cols[3]);
+	attributeDescriptions[7].offset = (uint32_t)offsetof(math::Float4x4, cols[3]);
 
 	return attributeDescriptions;
 }
