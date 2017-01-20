@@ -85,25 +85,25 @@ namespace ozz {
 				};
 
 				struct UpdateData {
-					enum UpdateFalgs {
-						UDF_NONE = 0x00,
-						UDF_VERTEX_BUFFER = 0x01,
-						UDF_INDEX_BUFFER = 0x02,
-						UDF_INSTANCE_BUFFER = 0x04,
-						UDF_UNIFORM_BUFFER = 0x08,
-						UDF_TEXTURE_IMAGE_BUFFER = 0x10,
-						UDF_ALL = UDF_VERTEX_BUFFER
-								| UDF_INDEX_BUFFER
-								| UDF_INSTANCE_BUFFER
-								| UDF_UNIFORM_BUFFER
-								| UDF_TEXTURE_IMAGE_BUFFER
-					};
-
 					GeometryBuffersObject	gbo;		// Geometry buffers (vertices and indices) object
 					InstancesBufferObject	ibo;		// Instances buffer (transformation matrix) object
 					TextureSamplerObject	tso;		// Texture sampler object
-					UniformBufferObject		ubo;		// Uniform buffer (MVP) object
-					uint32_t				flags;		// Used to filter state changes;
+					UniformBufferObject		ubo;		// Uniform buffer (MVP matrix) object
+				};
+
+				enum UpdateFalgs {
+					UDF_NONE = 0x00,
+					UDF_VERTEX_BUFFER = 0x01,
+					UDF_INDEX_BUFFER = 0x02,
+					UDF_INSTANCE_BUFFER = 0x04,
+					UDF_UNIFORM_BUFFER = 0x08,
+					UDF_TEXTURE_IMAGE_BUFFER = 0x10,
+					UDF_GEOMETRY_BUFFER = UDF_VERTEX_BUFFER
+					| UDF_INDEX_BUFFER,
+					UDF_ALL = UDF_GEOMETRY_BUFFER
+					| UDF_INSTANCE_BUFFER
+					| UDF_UNIFORM_BUFFER
+					| UDF_TEXTURE_IMAGE_BUFFER
 				};
 
 			private:
@@ -173,11 +173,7 @@ namespace ozz {
 				
 				void setDirty(bool bDirty);
 
-			public:
-
-				// Ctor
-				ModelRenderState();
-				virtual ~ModelRenderState();
+			protected:
 
 				// Gives a chance to create the render resources
 				virtual bool onInitResources(internal::ContextVulkan* context) override;
@@ -201,12 +197,14 @@ namespace ozz {
 				// as these have to be re-bound to the render pass
 				virtual bool isDirty() override;
 
-				// Initialize the template with meaningful data
-				bool init(const InitData& initData);
+			public:
+
+				// Ctor
+				ModelRenderState();
+				virtual ~ModelRenderState();
 
 				// Update render state according to the flags
-				bool update(const UpdateData& updateData);
-
+				bool update(const UpdateData& updateData, uint32_t updateFlags);
 			};
 
 		}

@@ -318,20 +318,17 @@ void ozz::sample::vk::LineRenderState::updateVertexBuffer(const std::vector<Vert
 	}
 }
 
-void ozz::sample::vk::LineRenderState::updateGeometryBufferObject()
+bool ozz::sample::vk::LineRenderState::updateVertexBufferObject(const VertexBufferObject& vbo)
 {
-	CHECK_AND_REPORT(gbo.vertices.size(), "Vertex buffer needs to contain valid data");
-	if (gbo.vertices.size() != numOfVertices) {
-		createVertexBuffer(gbo.vertices);
+	CHECK_AND_REPORT(vbo.vertices.size(), "Vertex buffer needs to contain valid data");
+	if (vbo.vertices.size() != numOfVertices) {
+		createVertexBuffer(vbo.vertices);
+		return true;
 	}
 	else {
-		updateVertexBuffer(gbo.vertices);
+		updateVertexBuffer(vbo.vertices);
+		return false;
 	}
-
-	// Once the geometry buffer has been updated, we need to
-	// clear its content, otherwise we would increment the
-	// number of vertices infinitely.
-	gbo.vertices.clear();
 }
 
 bool ozz::sample::vk::LineRenderState::updateUniformBufferObject(const UniformBufferObject& ubo)
@@ -418,49 +415,23 @@ bool ozz::sample::vk::LineRenderState::isDirty()
 	return dirty;
 }
 
-bool ozz::sample::vk::LineRenderState::add(
-	ozz::math::Float3 p0, ozz::math::Float3 p1,
-	Renderer::Color color, ozz::math::Float4x4 transform)
+bool ozz::sample::vk::LineRenderState::update(const UpdateData& updateData, uint32_t updateFlags)
 {
-	alignas(16) float p_s[4] = { 0 };
-	alignas(16) float p_e[4] = { 0 };
+	bool b_input_assambly_modified = false;
+	bool b_recreate_descriptor_set = false;
 
-	auto v0 = ozz::math::TransformPoint(
-		transform, ozz::math::simd_float4::Load(p0.x, p0.y, p0.z, 1.f));
-	
-	ozz::math::StorePtrU(v0, p_s);
-
-	auto v1 = ozz::math::TransformPoint(
-		transform, ozz::math::simd_float4::Load(p1.x, p1.y, p1.z, 1.f));
-
-	ozz::math::StorePtrU(v1, p_e);
-
-	gbo.vertices.emplace_back(Vertex{
-		math::Float3(p_s[0], p_s[1], p_s[2]),
-		color
-	});
-
-	gbo.vertices.emplace_back(Vertex{
-		math::Float3(p_e[0], p_e[1], p_e[2]),
-		color
-	});
-
-	return true;
-}
-
-bool ozz::sample::vk::LineRenderState::submit(const UpdateData& updateData)
-{
-	// We have stored all the lines into the geometry buffer,
-	// we now transfer the memory to that buffer on the GPU,
-	// if it differs in size, since last time, it will be
-	// re-created to accommodate the right amount of elements.
-	updateGeometryBufferObject();
+	// Vertex buffer
+	if (updateFlags & (UDF_VERTEX_BUFFER)) {
+		b_input_assambly_modified |= updateVertexBufferObject(updateData.vbo);
+	}
 
 	// Uniform buffer
-	if (updateData.flags & (UpdateData::UDF_UNIFORM_BUFFER)) {
-		if (updateUniformBufferObject(updateData.ubo) || descriptorSet == VK_NULL_HANDLE) {
-			createDescriptorSet();
-		}
+	if (updateFlags & (UDF_UNIFORM_BUFFER)) {
+		b_recreate_descriptor_set |= updateUniformBufferObject(updateData.ubo);
+	}
+
+	if (b_recreate_descriptor_set || descriptorSet == VK_NULL_HANDLE) {
+		createDescriptorSet();
 	}
 
 	return true;

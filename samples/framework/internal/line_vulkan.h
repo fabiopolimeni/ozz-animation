@@ -55,29 +55,27 @@ namespace ozz {
 					Renderer::Color		color;
 				};
 
+				struct VertexBufferObject {
+					std::vector<Vertex>		vertices;	// Vertex buffer
+				};
+
 				struct UniformBufferObject {
 					ozz::math::Float4x4 view;
 					ozz::math::Float4x4 proj;
 				};
 
 				struct UpdateData {
-					enum UpdateFalgs {
-						UDF_NONE = 0x00,
-						UDF_UNIFORM_BUFFER = 0x08,
-						UDF_ALL = UDF_UNIFORM_BUFFER
-					};
+					VertexBufferObject		vbo;		// Vertex buffer object
+					UniformBufferObject		ubo;		// Uniform buffer (VP matrix) object
+				};
 
-					UniformBufferObject		ubo;		// Uniform buffer (MVP) object
-					uint32_t				flags;		// Used to filter state changes;
+				enum UpdateFalgs {
+					UDF_VERTEX_BUFFER = 0x01,
+					UDF_UNIFORM_BUFFER = 0x08,
+					UDF_ALL = UDF_VERTEX_BUFFER | UDF_UNIFORM_BUFFER
 				};
 
 			private:
-
-				struct GeometryBuffersObject {
-					std::vector<Vertex>		vertices;	// Vertex buffer
-				};
-
-				GeometryBuffersObject gbo;
 
 				// Store the minimum information needed to determine
 				// whether a buffer needs to be re-instantiated or not.
@@ -114,19 +112,14 @@ namespace ozz {
 
 				void updateVertexBuffer(const std::vector<Vertex>& vertices);
 				
-				void updateGeometryBufferObject();
-				
 				// These series of functions return whether or not the respective
 				// buffer needed to be re-created as a result of the update.
+				bool updateVertexBufferObject(const VertexBufferObject& gbo);
 				bool updateUniformBufferObject(const UniformBufferObject& ubo);
 
 				void setDirty(bool bDirty);
 
-			public:
-
-				// Ctor
-				LineRenderState();
-				virtual ~LineRenderState();
+			protected:
 
 				// Gives a chance to create the render resources
 				virtual bool onInitResources(internal::ContextVulkan* context) override;
@@ -150,14 +143,14 @@ namespace ozz {
 				// as these have to be re-bound to the render pass.
 				virtual bool isDirty() override;
 
-				// Add a segment
-				bool add(ozz::math::Float3 p0, ozz::math::Float3 p1,
-					Renderer::Color color, ozz::math::Float4x4 transform);
+			public:
 
-				// Once all the segments have been accumulated,
-				// submit them all in once just before rendering.
-				bool submit(const UpdateData& updateData);
+				// Ctor
+				LineRenderState();
+				virtual ~LineRenderState();
 
+				// Update render state according to the flags
+				bool update(const UpdateData& updateData, uint32_t updateFlags);
 			};
 
 		}

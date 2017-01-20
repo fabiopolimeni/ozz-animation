@@ -77,6 +77,9 @@ namespace {
 		projection_matrix.cols[2] = projection.cols[2] * ozz::math::simd_float4::Load(0.f, 0.f, -1.f, -1.f);
 		return clip * projection_matrix;
 	}
+
+	// Needed to be declared globally because there is no nice way to forward declare a nested class/struct
+	static ozz::sample::vk::LineRenderState::VertexBufferObject g_rs_lines_vbo;
 }
 
 ozz::sample::internal::RendererVulkan::RendererVulkan(Camera * _camera)
@@ -109,6 +112,32 @@ void ozz::sample::internal::RendererVulkan::OnResize(int32_t _width, int32_t _he
 	context_->recreateSwapChain();
 }
 
+void ozz::sample::internal::RendererVulkan::addLineSegment(
+	ozz::math::Float3 p0, ozz::math::Float3 p1,
+	Renderer::Color color, ozz::math::Float4x4 transform)
+{
+	alignas(16) float p_s[4] = { 0 };
+	alignas(16) float p_e[4] = { 0 };
+
+	auto v0 = ozz::math::TransformPoint(
+		transform, ozz::math::simd_float4::Load(p0.x, p0.y, p0.z, 1.f));
+
+	ozz::math::StorePtrU(v0, p_s);
+
+	auto v1 = ozz::math::TransformPoint(
+		transform, ozz::math::simd_float4::Load(p1.x, p1.y, p1.z, 1.f));
+
+	ozz::math::StorePtrU(v1, p_e);
+
+	g_rs_lines_vbo.vertices.emplace_back(vk::LineRenderState::Vertex{
+		math::Float3(p_s[0], p_s[1], p_s[2]), color
+	});
+
+	g_rs_lines_vbo.vertices.emplace_back(vk::LineRenderState::Vertex{
+		math::Float3(p_e[0], p_e[1], p_e[2]), color
+	});
+}
+
 void ozz::sample::internal::RendererVulkan::DrawAxes(const ozz::math::Float4x4 & _transform)
 {
 	if (!rs_line_batcher_) {
@@ -119,7 +148,7 @@ void ozz::sample::internal::RendererVulkan::DrawAxes(const ozz::math::Float4x4 &
 	auto corrected_transform = getCorrectedModel(_transform);
 
 	// X axis (red).
-	rs_line_batcher_->add(
+	addLineSegment(
 		ozz::math::Float3(0, 0 ,0),
 		ozz::math::Float3(1, 0, 0),
 		{0xff, 0x00, 0x00, 0xff},
@@ -127,7 +156,7 @@ void ozz::sample::internal::RendererVulkan::DrawAxes(const ozz::math::Float4x4 &
 	);
 
 	// Y axis (green).
-	rs_line_batcher_->add(
+	addLineSegment(
 		ozz::math::Float3(0, 0, 0),
 		ozz::math::Float3(0, 1, 0),
 		{ 0x00, 0xff, 0x00, 0xff },
@@ -135,7 +164,7 @@ void ozz::sample::internal::RendererVulkan::DrawAxes(const ozz::math::Float4x4 &
 	);
 
 	// Z axis (blue).
-	rs_line_batcher_->add(
+	addLineSegment(
 		ozz::math::Float3(0, 0, 0),
 		ozz::math::Float3(0, 0, 1),
 		{ 0x00, 0x00, 0xff, 0xff },
@@ -160,7 +189,7 @@ void ozz::sample::internal::RendererVulkan::DrawGrid(int _cell_count, float _cel
 
 	// Renders lines along X axis.
 	for (int i = 0; i < _cell_count + 1; ++i) {		
-		rs_line_batcher_->add(begin, end,
+		addLineSegment(begin, end,
 			{ 0x54, 0x55, 0x50, 0xff },
 			math::Float4x4::identity()
 		);
@@ -177,7 +206,7 @@ void ozz::sample::internal::RendererVulkan::DrawGrid(int _cell_count, float _cel
 	end.z += extent;
 
 	for (int i = 0; i < _cell_count + 1; ++i) {
-		rs_line_batcher_->add(begin, end,
+		addLineSegment(begin, end,
 			{ 0x54, 0x55, 0x50, 0xff },
 			math::Float4x4::identity()
 		);
@@ -204,120 +233,20 @@ bool ozz::sample::internal::RendererVulkan::DrawBoxIm(const ozz::math::Box & _bo
 	// Fill box
 	{
 		if (!rs_immediate_box_) {
-			const math::Float3 pos[8] = {
-				math::Float3(_box.min.x, _box.min.y, _box.min.z),
-				math::Float3(_box.max.x, _box.min.y, _box.min.z),
-				math::Float3(_box.max.x, _box.max.y, _box.min.z),
-				math::Float3(_box.min.x, _box.max.y, _box.min.z),
-				math::Float3(_box.min.x, _box.min.y, _box.max.z),
-				math::Float3(_box.max.x, _box.min.y, _box.max.z),
-				math::Float3(_box.max.x, _box.max.y, _box.max.z),
-				math::Float3(_box.min.x, _box.max.y, _box.max.z)
-			};
-
-			const math::Float3 normals[6] = {
-				math::Float3(-1,  0,  0),	// n0. left
-				math::Float3(1,  0,  0),	// n1. right
-				math::Float3(0, -1,  0),	// n2. bottom
-				math::Float3(0,  1,  0),	// n3. top
-				math::Float3(0,  0, -1),	// n4. front
-				math::Float3(0,  0,  1)		// n5. back
-			};
-
-			const math::Float2 uvs[4] = {
-				math::Float2(0.0f, 0.0f),	// t0. top-left
-				math::Float2(1.0f, 0.0f),	// t1. top-right
-				math::Float2(1.0f, 1.0f),	// t2. bottom-right
-				math::Float2(0.0f, 1.0f)	// t3. bottom-left
-			};
-
-			std::vector<vk::ModelRenderState::Vertex> vertices = {
-				// n4. front
-				{ pos[0], normals[4], uvs[3], _colors[0] },
-				{ pos[1], normals[4], uvs[0], _colors[0] },
-				{ pos[2], normals[4], uvs[2], _colors[0] },
-				{ pos[3], normals[4], uvs[0], _colors[0] },
-				// n1. right
-				{ pos[1], normals[1], uvs[3], _colors[0] },
-				{ pos[5], normals[1], uvs[0], _colors[0] },
-				{ pos[6], normals[1], uvs[2], _colors[0] },
-				{ pos[2], normals[1], uvs[0], _colors[0] },
-				// n5. top
-				{ pos[3], normals[3], uvs[3], _colors[0] },
-				{ pos[2], normals[3], uvs[0], _colors[0] },
-				{ pos[6], normals[3], uvs[2], _colors[0] },
-				{ pos[7], normals[3], uvs[0], _colors[0] },
-				// n0. left
-				{ pos[4], normals[0], uvs[3], _colors[0] },
-				{ pos[0], normals[0], uvs[0], _colors[0] },
-				{ pos[3], normals[0], uvs[2], _colors[0] },
-				{ pos[7], normals[0], uvs[0], _colors[0] },
-				// n2. bottom
-				{ pos[4], normals[2], uvs[3], _colors[0] },
-				{ pos[5], normals[2], uvs[0], _colors[0] },
-				{ pos[1], normals[2], uvs[2], _colors[0] },
-				{ pos[0], normals[2], uvs[0], _colors[0] },
-				// n5. back
-				{ pos[5], normals[5], uvs[3], _colors[0] },
-				{ pos[4], normals[5], uvs[0], _colors[0] },
-				{ pos[7], normals[5], uvs[2], _colors[0] },
-				{ pos[6], normals[5], uvs[0], _colors[0] }
-			};
-
-			static std::vector<uint32_t> indices = {
-				0,  1,  2,  2,  3,  0,
-				4,  5,  6,  6,  7,  4,
-				8,  9, 10, 10, 11,  8,
-				12, 13, 14, 14, 15, 12,
-				16, 17, 18, 18, 19, 16,
-				20, 21, 22, 22, 23, 20
-			};
-
-			// Create a new model-render-state template
-			vk::ModelRenderState::InitData init_data;
-
-			// Set vertices and indices
-			init_data.gbo.vertices = vertices;
-			init_data.gbo.indices = indices;
-
-			// Static magenta texture
-			static const uint32_t magenta_color = 0xFFFF00FF;
-			init_data.tso.width = 1;
-			init_data.tso.height = 1;
-			init_data.tso.pixels = (const uint8_t*)(&magenta_color);
-
-			rs_immediate_box_ = context_->createRenderState<vk::ModelRenderState>();
-			CHECK_AND_REPORT(rs_immediate_box_, "Immediate-box render-state can't be created!");
-
-			// Create device resources, buffers and texture images
-			CHECK_AND_REPORT(rs_immediate_box_->init(init_data), "Cannot initialise the device-resources for the shadeed-boxs render-state!");
+			rs_immediate_box_ = InitBoxRenderState(_box, _colors[0]);
 		}
-
-		vk::ModelRenderState::UpdateData update_data;
-		update_data.flags = vk::ModelRenderState::UpdateData::UDF_NONE;
 
 		// Update instance buffer
 		{
+			vk::ModelRenderState::UpdateData update_data;
+
 			const auto numOfInstances = 1;
 			update_data.ibo.transforms.resize(numOfInstances);
 			update_data.ibo.transforms[0] = corrected_transform;
 
 			// Trigger instance buffer update
-			update_data.flags |= vk::ModelRenderState::UpdateData::UDF_INSTANCE_BUFFER;
+			rs_immediate_box_->update(update_data, vk::ModelRenderState::UDF_INSTANCE_BUFFER);
 		}
-
-		// Update uniform buffer
-		{
-			// Uniform data
-			update_data.ubo.model = math::Float4x4::identity();
-			update_data.ubo.view = getCorrectedView(camera_->view());
-			update_data.ubo.proj = getCorrectedProjection(camera_->projection());
-
-			// Trigger uniform buffer update
-			update_data.flags |= vk::ModelRenderState::UpdateData::UDF_UNIFORM_BUFFER;
-		}
-
-		rs_immediate_box_->update(update_data);
 	}
 
 	// Wireframe box
@@ -332,61 +261,61 @@ bool ozz::sample::internal::RendererVulkan::DrawBoxIm(const ozz::math::Box & _bo
 
 		// First face.
 		v1.y = _box.max.y;
-		rs_line_batcher_->add(v0, v1, _colors[1], corrected_transform);
+		addLineSegment(v0, v1, _colors[1], corrected_transform);
 		
 		v0 = v1;
 		v1.x = _box.max.x;
-		rs_line_batcher_->add(v0, v1, _colors[1], corrected_transform);
+		addLineSegment(v0, v1, _colors[1], corrected_transform);
 
 		v0 = v1;
 		v1.y = _box.min.y;
-		rs_line_batcher_->add(v0, v1, _colors[1], corrected_transform);
+		addLineSegment(v0, v1, _colors[1], corrected_transform);
 
 		v0 = v1;
 		v1.x = _box.min.x;
-		rs_line_batcher_->add(v0, v1, _colors[1], corrected_transform);
+		addLineSegment(v0, v1, _colors[1], corrected_transform);
 
 		// Second face.
 		v0 = v1;
 		v0.z = _box.max.z;
 		v1 = v0;
 		v1.y = _box.max.y;
-		rs_line_batcher_->add(v0, v1, _colors[1], corrected_transform);
+		addLineSegment(v0, v1, _colors[1], corrected_transform);
 
 		v0 = v1;
 		v1.x = _box.max.x;
-		rs_line_batcher_->add(v0, v1, _colors[1], corrected_transform);
+		addLineSegment(v0, v1, _colors[1], corrected_transform);
 
 		v0 = v1;
 		v1.y = _box.min.y;
-		rs_line_batcher_->add(v0, v1, _colors[1], corrected_transform);
+		addLineSegment(v0, v1, _colors[1], corrected_transform);
 
 		v0 = v1;
 		v1.x = _box.min.x;
-		rs_line_batcher_->add(v0, v1, _colors[1], corrected_transform);
+		addLineSegment(v0, v1, _colors[1], corrected_transform);
 
 		// Link faces.
 		v0 = v1;
 		v1.z = _box.min.z;
-		rs_line_batcher_->add(v0, v1, _colors[1], corrected_transform);
+		addLineSegment(v0, v1, _colors[1], corrected_transform);
 
 		v0 = v1;
 		v0.y = _box.max.y;
 		v1 = v0;
 		v1.z = _box.max.z;
-		rs_line_batcher_->add(v0, v1, _colors[1], corrected_transform);
+		addLineSegment(v0, v1, _colors[1], corrected_transform);
 		
 		v0 = v1;
 		v0.x = _box.max.x;
 		v1 = v0;
 		v1.z = _box.min.z;
-		rs_line_batcher_->add(v0, v1, _colors[1], corrected_transform);
+		addLineSegment(v0, v1, _colors[1], corrected_transform);
 
 		v0 = v1;
 		v0.y = _box.min.y;
 		v1 = v0;
 		v1.z = _box.max.z;
-		rs_line_batcher_->add(v0, v1, _colors[1], corrected_transform);
+		addLineSegment(v0, v1, _colors[1], corrected_transform);
 	}
 
 	return true;
@@ -396,100 +325,13 @@ bool ozz::sample::internal::RendererVulkan::DrawBoxShaded(const ozz::math::Box &
 {
 	// If a shaded box render state doesn't exist yet, create one
 	if (!rs_shaded_boxes_) {
-		const math::Float3 pos[8] = {
-			math::Float3(_box.min.x, _box.min.y, _box.min.z),
-			math::Float3(_box.max.x, _box.min.y, _box.min.z),
-			math::Float3(_box.max.x, _box.max.y, _box.min.z),
-			math::Float3(_box.min.x, _box.max.y, _box.min.z),
-			math::Float3(_box.min.x, _box.min.y, _box.max.z),
-			math::Float3(_box.max.x, _box.min.y, _box.max.z),
-			math::Float3(_box.max.x, _box.max.y, _box.max.z),
-			math::Float3(_box.min.x, _box.max.y, _box.max.z)
-		};
-
-		const math::Float3 normals[6] = {
-			math::Float3(-1,  0,  0),	// n0. left
-			math::Float3(1,  0,  0),	// n1. right
-			math::Float3(0, -1,  0),	// n2. bottom
-			math::Float3(0,  1,  0),	// n3. top
-			math::Float3(0,  0, -1),	// n4. front
-			math::Float3(0,  0,  1)		// n5. back
-		};
-
-		const math::Float2 uvs[4] = {
-			math::Float2(0.0f, 0.0f),	// t0. top-left
-			math::Float2(1.0f, 0.0f),	// t1. top-right
-			math::Float2(1.0f, 1.0f),	// t2. bottom-right
-			math::Float2(0.0f, 1.0f)	// t3. bottom-left
-		};
-
-		std::vector<vk::ModelRenderState::Vertex> vertices = {
-			// n4. front
-			{ pos[0], normals[4], uvs[3], _color },
-			{ pos[1], normals[4], uvs[0], _color },
-			{ pos[2], normals[4], uvs[2], _color },
-			{ pos[3], normals[4], uvs[0], _color },
-			// n1. right
-			{ pos[1], normals[1], uvs[3], _color },
-			{ pos[5], normals[1], uvs[0], _color },
-			{ pos[6], normals[1], uvs[2], _color },
-			{ pos[2], normals[1], uvs[0], _color },
-			// n5. top
-			{ pos[3], normals[3], uvs[3], _color },
-			{ pos[2], normals[3], uvs[0], _color },
-			{ pos[6], normals[3], uvs[2], _color },
-			{ pos[7], normals[3], uvs[0], _color },
-			// n0. left
-			{ pos[4], normals[0], uvs[3], _color },
-			{ pos[0], normals[0], uvs[0], _color },
-			{ pos[3], normals[0], uvs[2], _color },
-			{ pos[7], normals[0], uvs[0], _color },
-			// n2. bottom
-			{ pos[4], normals[2], uvs[3], _color },
-			{ pos[5], normals[2], uvs[0], _color },
-			{ pos[1], normals[2], uvs[2], _color },
-			{ pos[0], normals[2], uvs[0], _color },
-			// n5. back
-			{ pos[5], normals[5], uvs[3], _color },
-			{ pos[4], normals[5], uvs[0], _color },
-			{ pos[7], normals[5], uvs[2], _color },
-			{ pos[6], normals[5], uvs[0], _color }
-		};
-
-		static std::vector<uint32_t> indices = {
-			0,  1,  2,  2,  3,  0,
-			4,  5,  6,  6,  7,  4,
-			8,  9, 10, 10, 11,  8,
-		   12, 13, 14, 14, 15, 12,
-		   16, 17, 18, 18, 19, 16,
-		   20, 21, 22, 22, 23, 20
-		};
-
-		// Create a new model-render-state template
-		vk::ModelRenderState::InitData init_data;
-
-		// Set vertices and indices
-		init_data.gbo.vertices = vertices;
-		init_data.gbo.indices = indices;
-
-		// Static magenta texture
-		static const uint32_t magenta_color = 0xFFFF00FF;
-		init_data.tso.width = 1;
-		init_data.tso.height = 1;
-		init_data.tso.pixels = (const uint8_t*)(&magenta_color);
-
-		rs_shaded_boxes_ = context_->createRenderState<vk::ModelRenderState>();
-		CHECK_AND_REPORT(rs_shaded_boxes_, "Shaded-boxes render-state can't be created!");
-
-		// Create device resources, buffers and texture images
-		CHECK_AND_REPORT(rs_shaded_boxes_->init(init_data), "Cannot initialise the device-resources for the shadeed-boxs render-state!");
+		rs_shaded_boxes_ = InitBoxRenderState(_box, _color);
 	}
-
-	vk::ModelRenderState::UpdateData update_data;
-	update_data.flags = vk::ModelRenderState::UpdateData::UDF_NONE;
 
 	// Update instance buffer
 	{
+		vk::ModelRenderState::UpdateData update_data;
+
 		const auto numOfInstances = _transforms.Count();
 		update_data.ibo.transforms.resize(numOfInstances);
 		for (auto iIt = 0; iIt < numOfInstances; ++iIt) {
@@ -497,21 +339,9 @@ bool ozz::sample::internal::RendererVulkan::DrawBoxShaded(const ozz::math::Box &
 		}
 
 		// Trigger instance buffer update
-		update_data.flags |= vk::ModelRenderState::UpdateData::UDF_INSTANCE_BUFFER;
+		rs_shaded_boxes_->update(update_data, vk::ModelRenderState::UDF_INSTANCE_BUFFER);
 	}
 
-	// Update uniform buffer
-	{
-		// Uniform data
-		update_data.ubo.model = math::Float4x4::identity();
-		update_data.ubo.view = getCorrectedView(camera_->view());
-		update_data.ubo.proj = getCorrectedProjection(camera_->projection());
-
-		// Trigger uniform buffer update
-		update_data.flags |= vk::ModelRenderState::UpdateData::UDF_UNIFORM_BUFFER;
-	}
-
-	rs_shaded_boxes_->update(update_data);
 	return true;
 }
 
@@ -537,13 +367,30 @@ bool ozz::sample::internal::RendererVulkan::DrawBinormals(ozz::Range<const float
 
 bool ozz::sample::internal::RendererVulkan::RenderFrame()
 {
-	// Update line batcher uniform data
+	// Update render state uniform buffers
 	{
-		vk::LineRenderState::UpdateData line_batcher_update_data;
-		line_batcher_update_data.ubo.proj = getCorrectedProjection(camera_->projection());
-		line_batcher_update_data.ubo.view = getCorrectedView(camera_->view());
-		line_batcher_update_data.flags = vk::LineRenderState::UpdateData::UDF_UNIFORM_BUFFER;
-		rs_line_batcher_->submit(line_batcher_update_data);
+		auto view = getCorrectedView(camera_->view());
+		auto proj = getCorrectedProjection(camera_->projection());
+
+		if (rs_shaded_boxes_) {
+			vk::ModelRenderState::UpdateData update_data;
+			update_data.ubo = { math::Float4x4::identity(), view, proj };
+			rs_shaded_boxes_->update(update_data, vk::ModelRenderState::UDF_UNIFORM_BUFFER);
+		}
+
+		if (rs_immediate_box_) {
+			vk::ModelRenderState::UpdateData update_data;
+			update_data.ubo = { math::Float4x4::identity(), view, proj };
+			rs_immediate_box_->update(update_data, vk::ModelRenderState::UDF_UNIFORM_BUFFER);
+		}
+
+		if (rs_line_batcher_) {
+			vk::LineRenderState::UpdateData update_data;
+			update_data.ubo = { view, proj };
+			update_data.vbo = g_rs_lines_vbo;
+			rs_line_batcher_->update(update_data, vk::LineRenderState::UDF_ALL);
+			g_rs_lines_vbo.vertices.clear();
+		}
 	}
 
 	return context_->drawFrame();
@@ -565,4 +412,97 @@ void ozz::sample::internal::RendererVulkan::DrawPosture_Impl(const ozz::math::Fl
 
 void ozz::sample::internal::RendererVulkan::DrawPosture_InstancedImpl(const ozz::math::Float4x4 & _transform, const float * _uniforms, int _instance_count, bool _draw_joints)
 {
+}
+
+ozz::sample::vk::ModelRenderState* ozz::sample::internal::RendererVulkan::InitBoxRenderState(const ozz::math::Box& _box, const Color _color)
+{
+	const math::Float3 pos[8] = {
+		math::Float3(_box.min.x, _box.min.y, _box.min.z),
+		math::Float3(_box.max.x, _box.min.y, _box.min.z),
+		math::Float3(_box.max.x, _box.max.y, _box.min.z),
+		math::Float3(_box.min.x, _box.max.y, _box.min.z),
+		math::Float3(_box.min.x, _box.min.y, _box.max.z),
+		math::Float3(_box.max.x, _box.min.y, _box.max.z),
+		math::Float3(_box.max.x, _box.max.y, _box.max.z),
+		math::Float3(_box.min.x, _box.max.y, _box.max.z)
+	};
+
+	const math::Float3 normals[6] = {
+		math::Float3(-1,  0,  0),	// n0. left
+		math::Float3(1,  0,  0),	// n1. right
+		math::Float3(0, -1,  0),	// n2. bottom
+		math::Float3(0,  1,  0),	// n3. top
+		math::Float3(0,  0, -1),	// n4. front
+		math::Float3(0,  0,  1)		// n5. back
+	};
+
+	const math::Float2 uvs[4] = {
+		math::Float2(0.0f, 0.0f),	// t0. top-left
+		math::Float2(1.0f, 0.0f),	// t1. top-right
+		math::Float2(1.0f, 1.0f),	// t2. bottom-right
+		math::Float2(0.0f, 1.0f)	// t3. bottom-left
+	};
+
+	std::vector<vk::ModelRenderState::Vertex> vertices = {
+		// n4. front
+		{ pos[0], normals[4], uvs[3], _color },
+		{ pos[1], normals[4], uvs[0], _color },
+		{ pos[2], normals[4], uvs[2], _color },
+		{ pos[3], normals[4], uvs[0], _color },
+		// n1. right
+		{ pos[1], normals[1], uvs[3], _color },
+		{ pos[5], normals[1], uvs[0], _color },
+		{ pos[6], normals[1], uvs[2], _color },
+		{ pos[2], normals[1], uvs[0], _color },
+		// n5. top
+		{ pos[3], normals[3], uvs[3], _color },
+		{ pos[2], normals[3], uvs[0], _color },
+		{ pos[6], normals[3], uvs[2], _color },
+		{ pos[7], normals[3], uvs[0], _color },
+		// n0. left
+		{ pos[4], normals[0], uvs[3], _color },
+		{ pos[0], normals[0], uvs[0], _color },
+		{ pos[3], normals[0], uvs[2], _color },
+		{ pos[7], normals[0], uvs[0], _color },
+		// n2. bottom
+		{ pos[4], normals[2], uvs[3], _color },
+		{ pos[5], normals[2], uvs[0], _color },
+		{ pos[1], normals[2], uvs[2], _color },
+		{ pos[0], normals[2], uvs[0], _color },
+		// n5. back
+		{ pos[5], normals[5], uvs[3], _color },
+		{ pos[4], normals[5], uvs[0], _color },
+		{ pos[7], normals[5], uvs[2], _color },
+		{ pos[6], normals[5], uvs[0], _color }
+	};
+
+	static std::vector<uint32_t> indices = {
+		0,  1,  2,  2,  3,  0,
+		4,  5,  6,  6,  7,  4,
+		8,  9, 10, 10, 11,  8,
+		12, 13, 14, 14, 15, 12,
+		16, 17, 18, 18, 19, 16,
+		20, 21, 22, 22, 23, 20
+	};
+
+	// Create a new model-render-state template
+	vk::ModelRenderState::UpdateData update_data;
+
+	// Set vertices and indices
+	update_data.gbo.vertices = vertices;
+	update_data.gbo.indices = indices;
+
+	// Static magenta texture
+	static const uint32_t magenta_color = 0xFFFF00FF;
+	update_data.tso.width = 1;
+	update_data.tso.height = 1;
+	update_data.tso.pixels = (const uint8_t*)(&magenta_color);
+
+	vk::ModelRenderState* render_state = context_->createRenderState<vk::ModelRenderState>();
+	CHECK_AND_REPORT(render_state, "Model box render-state can't be created!");
+
+	// Update initial geometry and texture data
+	render_state->update(update_data, vk::ModelRenderState::UDF_GEOMETRY_BUFFER | vk::ModelRenderState::UDF_TEXTURE_IMAGE_BUFFER);
+
+	return render_state;
 }

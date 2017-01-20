@@ -663,48 +663,32 @@ void ozz::sample::vk::ModelRenderState::setDirty(bool bDirty) {
 	dirty = bDirty;
 }
 
-bool ozz::sample::vk::ModelRenderState::init(const InitData& initData) {
-	// Geometry
-	createVertexBuffer(initData.gbo.vertices);
-	createIndexBuffer(initData.gbo.indices);
-
-	// Texture
-	createTextureImage(initData.tso.pixels, initData.tso.width, initData.tso.height);
-	createTextureImageView();
-	createTextureSampler();
-
-	// The descriptor set depends on the above buffers
-	createDescriptorSet();
-
-	return true;
-}
-
 // Filter what to update based on the set flags
-bool ozz::sample::vk::ModelRenderState::update(const UpdateData& updateData) {
+bool ozz::sample::vk::ModelRenderState::update(const UpdateData& updateData, uint32_t updateFlags) {
 	bool b_input_assambly_modified = false;
 	bool b_recreate_descriptor_set = false;
 	
 	// Geometry buffers
-	if (updateData.flags & (UpdateData::UDF_VERTEX_BUFFER | UpdateData::UDF_INDEX_BUFFER)) {
+	if (updateFlags & (UDF_VERTEX_BUFFER | UDF_INDEX_BUFFER)) {
 		b_input_assambly_modified |= updateGeometryBufferObject(updateData.gbo);
 	}
 
 	// Instances buffer
-	if (updateData.flags & (UpdateData::UDF_INSTANCE_BUFFER)) {
+	if (updateFlags & (UDF_INSTANCE_BUFFER)) {
 		b_input_assambly_modified |= updateInstanceBufferObject(updateData.ibo);
 	}
 
 	// Texture buffer
-	if (updateData.flags & (UpdateData::UDF_TEXTURE_IMAGE_BUFFER)) {
+	if (updateFlags & (UDF_TEXTURE_IMAGE_BUFFER)) {
 		b_recreate_descriptor_set |= updateTextureImageBufferObject(updateData.tso);
 	}
 
 	// Uniform buffer
-	if (updateData.flags & (UpdateData::UDF_UNIFORM_BUFFER)) {
+	if (updateFlags & (UDF_UNIFORM_BUFFER)) {
 		b_recreate_descriptor_set |= updateUniformBufferObject(updateData.ubo);
 	}
 
-	if (b_recreate_descriptor_set) {
+	if (b_recreate_descriptor_set || descriptorSet == VK_NULL_HANDLE) {
 		createDescriptorSet();
 	}
 

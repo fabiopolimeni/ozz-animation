@@ -147,6 +147,12 @@ namespace ozz {
 					const float* _uniforms, int _instance_count,
 					bool _draw_joints);
 
+				vk::ModelRenderState* InitBoxRenderState(
+					const ozz::math::Box& _box, const Color _color);
+
+				void addLineSegment(ozz::math::Float3 p0, ozz::math::Float3 p1,
+					Renderer::Color color, ozz::math::Float4x4 transform);
+
 				// Application camera that provides rendering matrices.
 				Camera* camera_;
 
