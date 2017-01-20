@@ -112,7 +112,9 @@ void ozz::sample::vk::ModelRenderState::createDescriptorSetLayout() {
 void ozz::sample::vk::ModelRenderState::createGraphicsPipeline() {
 	std::vector<char> vertShaderCode;
 	std::vector<char> fragShaderCode;
-	bool validShaders = vk::readFile("../shaders/vert.spv", vertShaderCode) && vk::readFile("../shaders/frag.spv", fragShaderCode);
+	bool validShaders =
+		   vk::readFile("../shaders/model_vert.spv", vertShaderCode)
+		&& vk::readFile("../shaders/model_frag.spv", fragShaderCode);
 
 	CHECK_AND_REPORT(validShaders, "Failed to load shader code. The graphics pipeline cannot be created");
 

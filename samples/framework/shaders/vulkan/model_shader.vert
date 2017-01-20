@@ -25,7 +25,7 @@ void main() {
 	
 	mat4 world_matrix = inTransform;
 
- 	vec4 vertex = vec4(inPosition.xyz, 1.);
+  vec4 vertex = vec4(inPosition.xyz, 1.0);
 
  	mat3 cross_matrix = mat3(
    		cross(world_matrix[1].xyz, world_matrix[2].xyz),
@@ -39,5 +39,5 @@ void main() {
     outColor = inColor;
     outTexCoord = inTexCoord;
 
-    gl_Position = ubo.proj * ubo.view * ubo.model * world_matrix * vec4(inPosition, 1.0);
+    gl_Position = ubo.proj * ubo.view * ubo.model * world_matrix * vertex;
 }

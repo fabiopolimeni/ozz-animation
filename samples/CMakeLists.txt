@@ -9,8 +9,10 @@ set(ozz_vulkan_shader_directory "${CMAKE_SOURCE_DIR}/samples/framework/shaders/v
 if (WIN32 AND ozz_build_with_vulkan)
   add_custom_target(vulkan_shaders
     COMMAND ${CMAKE_COMMAND} -E make_directory shaders
-    COMMAND ${CMAKE_COMMAND} -E copy "${ozz_vulkan_shader_directory}/vert.spv" "./shaders/vert.spv"
-    COMMAND ${CMAKE_COMMAND} -E copy "${ozz_vulkan_shader_directory}/frag.spv" "./shaders/frag.spv")
+    COMMAND ${CMAKE_COMMAND} -E copy "${ozz_vulkan_shader_directory}/model_vert.spv" "./shaders/model_vert.spv"
+    COMMAND ${CMAKE_COMMAND} -E copy "${ozz_vulkan_shader_directory}/model_frag.spv" "./shaders/model_frag.spv"
+    COMMAND ${CMAKE_COMMAND} -E copy "${ozz_vulkan_shader_directory}/line_vert.spv" "./shaders/line_vert.spv"
+    COMMAND ${CMAKE_COMMAND} -E copy "${ozz_vulkan_shader_directory}/line_frag.spv" "./shaders/line_frag.spv")
 endif()
 
 # Adds the sample framework to the include path.
