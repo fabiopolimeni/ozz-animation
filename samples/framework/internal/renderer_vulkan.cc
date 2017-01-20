@@ -82,6 +82,7 @@ namespace {
 ozz::sample::internal::RendererVulkan::RendererVulkan(Camera * _camera)
 	: ozz::sample::Renderer(), camera_(_camera)
 	, rs_shaded_boxes_(nullptr)
+	, rs_immediate_box_(nullptr)
 	, rs_line_batcher_(nullptr)
 {
 }
@@ -89,6 +90,7 @@ ozz::sample::internal::RendererVulkan::RendererVulkan(Camera * _camera)
 ozz::sample::internal::RendererVulkan::~RendererVulkan()
 {
 	context_->destroyRenderState(rs_shaded_boxes_);
+	context_->destroyRenderState(rs_immediate_box_);
 	context_->destroyRenderState(rs_line_batcher_);
 
 	context_->shutdown();
@@ -114,12 +116,14 @@ void ozz::sample::internal::RendererVulkan::DrawAxes(const ozz::math::Float4x4 &
 		CHECK_AND_REPORT(rs_line_batcher_, "Line-batcher render-state can't be created!");
 	}
 
+	auto corrected_transform = getCorrectedModel(_transform);
+
 	// X axis (red).
 	rs_line_batcher_->add(
 		ozz::math::Float3(0, 0 ,0),
 		ozz::math::Float3(1, 0, 0),
 		{0xff, 0x00, 0x00, 0xff},
-		getCorrectedModel(_transform)
+		corrected_transform
 	);
 
 	// Y axis (green).
@@ -127,7 +131,7 @@ void ozz::sample::internal::RendererVulkan::DrawAxes(const ozz::math::Float4x4 &
 		ozz::math::Float3(0, 0, 0),
 		ozz::math::Float3(0, 1, 0),
 		{ 0x00, 0xff, 0x00, 0xff },
-		getCorrectedModel(_transform)
+		corrected_transform
 	);
 
 	// Z axis (blue).
@@ -135,12 +139,52 @@ void ozz::sample::internal::RendererVulkan::DrawAxes(const ozz::math::Float4x4 &
 		ozz::math::Float3(0, 0, 0),
 		ozz::math::Float3(0, 0, 1),
 		{ 0x00, 0x00, 0xff, 0xff },
-		getCorrectedModel(_transform)
+		corrected_transform
 	);
 }
 
 void ozz::sample::internal::RendererVulkan::DrawGrid(int _cell_count, float _cell_size)
 {
+	if (!rs_line_batcher_) {
+		rs_line_batcher_ = context_->createRenderState<vk::LineRenderState>();
+		CHECK_AND_REPORT(rs_line_batcher_, "Line-batcher render-state can't be created!");
+	}
+
+	const float extent = _cell_count * _cell_size;
+	const float half_extent = extent * 0.5f;
+	const ozz::math::Float3 corner(-half_extent, 0, -half_extent);
+
+	ozz::math::Float3 begin(corner.x, corner.y, corner.z);
+	ozz::math::Float3 end = begin;
+	end.x += extent;
+
+	// Renders lines along X axis.
+	for (int i = 0; i < _cell_count + 1; ++i) {		
+		rs_line_batcher_->add(begin, end,
+			{ 0x54, 0x55, 0x50, 0xff },
+			math::Float4x4::identity()
+		);
+
+		begin.z += _cell_size;
+		end.z += _cell_size;
+	}
+
+	// Renders lines along Z axis.
+	begin.x = corner.x;
+	begin.y = corner.y;
+	begin.z = corner.z;
+	end = begin;
+	end.z += extent;
+
+	for (int i = 0; i < _cell_count + 1; ++i) {
+		rs_line_batcher_->add(begin, end,
+			{ 0x54, 0x55, 0x50, 0xff },
+			math::Float4x4::identity()
+		);
+
+		begin.x += _cell_size;
+		end.x += _cell_size;
+	}
 }
 
 bool ozz::sample::internal::RendererVulkan::DrawSkeleton(const animation::Skeleton & _skeleton, const ozz::math::Float4x4 & _transform, bool _draw_joints)
@@ -155,6 +199,196 @@ bool ozz::sample::internal::RendererVulkan::DrawPosture(const animation::Skeleto
 
 bool ozz::sample::internal::RendererVulkan::DrawBoxIm(const ozz::math::Box & _box, const ozz::math::Float4x4 & _transform, const Color _colors[2])
 {
+	auto corrected_transform = getCorrectedModel(_transform);
+
+	// Fill box
+	{
+		if (!rs_immediate_box_) {
+			const math::Float3 pos[8] = {
+				math::Float3(_box.min.x, _box.min.y, _box.min.z),
+				math::Float3(_box.max.x, _box.min.y, _box.min.z),
+				math::Float3(_box.max.x, _box.max.y, _box.min.z),
+				math::Float3(_box.min.x, _box.max.y, _box.min.z),
+				math::Float3(_box.min.x, _box.min.y, _box.max.z),
+				math::Float3(_box.max.x, _box.min.y, _box.max.z),
+				math::Float3(_box.max.x, _box.max.y, _box.max.z),
+				math::Float3(_box.min.x, _box.max.y, _box.max.z)
+			};
+
+			const math::Float3 normals[6] = {
+				math::Float3(-1,  0,  0),	// n0. left
+				math::Float3(1,  0,  0),	// n1. right
+				math::Float3(0, -1,  0),	// n2. bottom
+				math::Float3(0,  1,  0),	// n3. top
+				math::Float3(0,  0, -1),	// n4. front
+				math::Float3(0,  0,  1)		// n5. back
+			};
+
+			const math::Float2 uvs[4] = {
+				math::Float2(0.0f, 0.0f),	// t0. top-left
+				math::Float2(1.0f, 0.0f),	// t1. top-right
+				math::Float2(1.0f, 1.0f),	// t2. bottom-right
+				math::Float2(0.0f, 1.0f)	// t3. bottom-left
+			};
+
+			std::vector<vk::ModelRenderState::Vertex> vertices = {
+				// n4. front
+				{ pos[0], normals[4], uvs[3], _colors[0] },
+				{ pos[1], normals[4], uvs[0], _colors[0] },
+				{ pos[2], normals[4], uvs[2], _colors[0] },
+				{ pos[3], normals[4], uvs[0], _colors[0] },
+				// n1. right
+				{ pos[1], normals[1], uvs[3], _colors[0] },
+				{ pos[5], normals[1], uvs[0], _colors[0] },
+				{ pos[6], normals[1], uvs[2], _colors[0] },
+				{ pos[2], normals[1], uvs[0], _colors[0] },
+				// n5. top
+				{ pos[3], normals[3], uvs[3], _colors[0] },
+				{ pos[2], normals[3], uvs[0], _colors[0] },
+				{ pos[6], normals[3], uvs[2], _colors[0] },
+				{ pos[7], normals[3], uvs[0], _colors[0] },
+				// n0. left
+				{ pos[4], normals[0], uvs[3], _colors[0] },
+				{ pos[0], normals[0], uvs[0], _colors[0] },
+				{ pos[3], normals[0], uvs[2], _colors[0] },
+				{ pos[7], normals[0], uvs[0], _colors[0] },
+				// n2. bottom
+				{ pos[4], normals[2], uvs[3], _colors[0] },
+				{ pos[5], normals[2], uvs[0], _colors[0] },
+				{ pos[1], normals[2], uvs[2], _colors[0] },
+				{ pos[0], normals[2], uvs[0], _colors[0] },
+				// n5. back
+				{ pos[5], normals[5], uvs[3], _colors[0] },
+				{ pos[4], normals[5], uvs[0], _colors[0] },
+				{ pos[7], normals[5], uvs[2], _colors[0] },
+				{ pos[6], normals[5], uvs[0], _colors[0] }
+			};
+
+			static std::vector<uint32_t> indices = {
+				0,  1,  2,  2,  3,  0,
+				4,  5,  6,  6,  7,  4,
+				8,  9, 10, 10, 11,  8,
+				12, 13, 14, 14, 15, 12,
+				16, 17, 18, 18, 19, 16,
+				20, 21, 22, 22, 23, 20
+			};
+
+			// Create a new model-render-state template
+			vk::ModelRenderState::InitData init_data;
+
+			// Set vertices and indices
+			init_data.gbo.vertices = vertices;
+			init_data.gbo.indices = indices;
+
+			// Static magenta texture
+			static const uint32_t magenta_color = 0xFFFF00FF;
+			init_data.tso.width = 1;
+			init_data.tso.height = 1;
+			init_data.tso.pixels = (const uint8_t*)(&magenta_color);
+
+			rs_immediate_box_ = context_->createRenderState<vk::ModelRenderState>();
+			CHECK_AND_REPORT(rs_immediate_box_, "Immediate-box render-state can't be created!");
+
+			// Create device resources, buffers and texture images
+			CHECK_AND_REPORT(rs_immediate_box_->init(init_data), "Cannot initialise the device-resources for the shadeed-boxs render-state!");
+		}
+
+		vk::ModelRenderState::UpdateData update_data;
+		update_data.flags = vk::ModelRenderState::UpdateData::UDF_NONE;
+
+		// Update instance buffer
+		{
+			const auto numOfInstances = 1;
+			update_data.ibo.transforms.resize(numOfInstances);
+			update_data.ibo.transforms[0] = corrected_transform;
+
+			// Trigger instance buffer update
+			update_data.flags |= vk::ModelRenderState::UpdateData::UDF_INSTANCE_BUFFER;
+		}
+
+		// Update uniform buffer
+		{
+			// Uniform data
+			update_data.ubo.model = math::Float4x4::identity();
+			update_data.ubo.view = getCorrectedView(camera_->view());
+			update_data.ubo.proj = getCorrectedProjection(camera_->projection());
+
+			// Trigger uniform buffer update
+			update_data.flags |= vk::ModelRenderState::UpdateData::UDF_UNIFORM_BUFFER;
+		}
+
+		rs_immediate_box_->update(update_data);
+	}
+
+	// Wireframe box
+	{
+		if (!rs_line_batcher_) {
+			rs_line_batcher_ = context_->createRenderState<vk::LineRenderState>();
+			CHECK_AND_REPORT(rs_line_batcher_, "Line-batcher render-state can't be created!");
+		}
+
+		ozz::math::Float3 v0 = { _box.min.x, _box.min.y, _box.min.z };
+		auto v1 = v0;
+
+		// First face.
+		v1.y = _box.max.y;
+		rs_line_batcher_->add(v0, v1, _colors[1], corrected_transform);
+		
+		v0 = v1;
+		v1.x = _box.max.x;
+		rs_line_batcher_->add(v0, v1, _colors[1], corrected_transform);
+
+		v0 = v1;
+		v1.y = _box.min.y;
+		rs_line_batcher_->add(v0, v1, _colors[1], corrected_transform);
+
+		v0 = v1;
+		v1.x = _box.min.x;
+		rs_line_batcher_->add(v0, v1, _colors[1], corrected_transform);
+
+		// Second face.
+		v0 = v1;
+		v0.z = _box.max.z;
+		v1 = v0;
+		v1.y = _box.max.y;
+		rs_line_batcher_->add(v0, v1, _colors[1], corrected_transform);
+
+		v0 = v1;
+		v1.x = _box.max.x;
+		rs_line_batcher_->add(v0, v1, _colors[1], corrected_transform);
+
+		v0 = v1;
+		v1.y = _box.min.y;
+		rs_line_batcher_->add(v0, v1, _colors[1], corrected_transform);
+
+		v0 = v1;
+		v1.x = _box.min.x;
+		rs_line_batcher_->add(v0, v1, _colors[1], corrected_transform);
+
+		// Link faces.
+		v0 = v1;
+		v1.z = _box.min.z;
+		rs_line_batcher_->add(v0, v1, _colors[1], corrected_transform);
+
+		v0 = v1;
+		v0.y = _box.max.y;
+		v1 = v0;
+		v1.z = _box.max.z;
+		rs_line_batcher_->add(v0, v1, _colors[1], corrected_transform);
+		
+		v0 = v1;
+		v0.x = _box.max.x;
+		v1 = v0;
+		v1.z = _box.min.z;
+		rs_line_batcher_->add(v0, v1, _colors[1], corrected_transform);
+
+		v0 = v1;
+		v0.y = _box.min.y;
+		v1 = v0;
+		v1.z = _box.max.z;
+		rs_line_batcher_->add(v0, v1, _colors[1], corrected_transform);
+	}
+
 	return true;
 }
 

@@ -155,6 +155,7 @@ namespace ozz {
 
 				// Shaded box render state
 				vk::ModelRenderState* rs_shaded_boxes_;
+				vk::ModelRenderState* rs_immediate_box_;
 
 				// Line batcher render state
 				vk::LineRenderState* rs_line_batcher_;
