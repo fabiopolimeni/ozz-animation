@@ -27,7 +27,9 @@ if(NOT EMSCRIPTEN)
         internal/mesh_vulkan.h
         internal/mesh_vulkan.cc
         internal/skeleton_vulkan.h
-        internal/skeleton_vulkan.cc)
+        internal/skeleton_vulkan.cc
+        internal/imgui_vulkan.h
+        internal/imgui_vulkan.cc)
 
       set(ozz_libs_to_link
         glfw)
