@@ -112,7 +112,7 @@ void ozz::sample::internal::RendererVulkan::OnResize(int32_t _width, int32_t _he
 	context_->recreateSwapChain();
 }
 
-void ozz::sample::internal::RendererVulkan::addLineSegment(
+void ozz::sample::internal::RendererVulkan::AddLineSegment(
 	ozz::math::Float3 p0, ozz::math::Float3 p1,
 	Renderer::Color color, ozz::math::Float4x4 transform)
 {
@@ -148,7 +148,7 @@ void ozz::sample::internal::RendererVulkan::DrawAxes(const ozz::math::Float4x4 &
 	auto corrected_transform = getCorrectedModel(_transform);
 
 	// X axis (red).
-	addLineSegment(
+	AddLineSegment(
 		ozz::math::Float3(0, 0 ,0),
 		ozz::math::Float3(1, 0, 0),
 		{0xff, 0x00, 0x00, 0xff},
@@ -156,7 +156,7 @@ void ozz::sample::internal::RendererVulkan::DrawAxes(const ozz::math::Float4x4 &
 	);
 
 	// Y axis (green).
-	addLineSegment(
+	AddLineSegment(
 		ozz::math::Float3(0, 0, 0),
 		ozz::math::Float3(0, 1, 0),
 		{ 0x00, 0xff, 0x00, 0xff },
@@ -164,7 +164,7 @@ void ozz::sample::internal::RendererVulkan::DrawAxes(const ozz::math::Float4x4 &
 	);
 
 	// Z axis (blue).
-	addLineSegment(
+	AddLineSegment(
 		ozz::math::Float3(0, 0, 0),
 		ozz::math::Float3(0, 0, 1),
 		{ 0x00, 0x00, 0xff, 0xff },
@@ -189,7 +189,7 @@ void ozz::sample::internal::RendererVulkan::DrawGrid(int _cell_count, float _cel
 
 	// Renders lines along X axis.
 	for (int i = 0; i < _cell_count + 1; ++i) {		
-		addLineSegment(begin, end,
+		AddLineSegment(begin, end,
 			{ 0x54, 0x55, 0x50, 0xff },
 			math::Float4x4::identity()
 		);
@@ -206,7 +206,7 @@ void ozz::sample::internal::RendererVulkan::DrawGrid(int _cell_count, float _cel
 	end.z += extent;
 
 	for (int i = 0; i < _cell_count + 1; ++i) {
-		addLineSegment(begin, end,
+		AddLineSegment(begin, end,
 			{ 0x54, 0x55, 0x50, 0xff },
 			math::Float4x4::identity()
 		);
@@ -261,61 +261,61 @@ bool ozz::sample::internal::RendererVulkan::DrawBoxIm(const ozz::math::Box & _bo
 
 		// First face.
 		v1.y = _box.max.y;
-		addLineSegment(v0, v1, _colors[1], corrected_transform);
+		AddLineSegment(v0, v1, _colors[1], corrected_transform);
 		
 		v0 = v1;
 		v1.x = _box.max.x;
-		addLineSegment(v0, v1, _colors[1], corrected_transform);
+		AddLineSegment(v0, v1, _colors[1], corrected_transform);
 
 		v0 = v1;
 		v1.y = _box.min.y;
-		addLineSegment(v0, v1, _colors[1], corrected_transform);
+		AddLineSegment(v0, v1, _colors[1], corrected_transform);
 
 		v0 = v1;
 		v1.x = _box.min.x;
-		addLineSegment(v0, v1, _colors[1], corrected_transform);
+		AddLineSegment(v0, v1, _colors[1], corrected_transform);
 
 		// Second face.
 		v0 = v1;
 		v0.z = _box.max.z;
 		v1 = v0;
 		v1.y = _box.max.y;
-		addLineSegment(v0, v1, _colors[1], corrected_transform);
+		AddLineSegment(v0, v1, _colors[1], corrected_transform);
 
 		v0 = v1;
 		v1.x = _box.max.x;
-		addLineSegment(v0, v1, _colors[1], corrected_transform);
+		AddLineSegment(v0, v1, _colors[1], corrected_transform);
 
 		v0 = v1;
 		v1.y = _box.min.y;
-		addLineSegment(v0, v1, _colors[1], corrected_transform);
+		AddLineSegment(v0, v1, _colors[1], corrected_transform);
 
 		v0 = v1;
 		v1.x = _box.min.x;
-		addLineSegment(v0, v1, _colors[1], corrected_transform);
+		AddLineSegment(v0, v1, _colors[1], corrected_transform);
 
 		// Link faces.
 		v0 = v1;
 		v1.z = _box.min.z;
-		addLineSegment(v0, v1, _colors[1], corrected_transform);
+		AddLineSegment(v0, v1, _colors[1], corrected_transform);
 
 		v0 = v1;
 		v0.y = _box.max.y;
 		v1 = v0;
 		v1.z = _box.max.z;
-		addLineSegment(v0, v1, _colors[1], corrected_transform);
+		AddLineSegment(v0, v1, _colors[1], corrected_transform);
 		
 		v0 = v1;
 		v0.x = _box.max.x;
 		v1 = v0;
 		v1.z = _box.min.z;
-		addLineSegment(v0, v1, _colors[1], corrected_transform);
+		AddLineSegment(v0, v1, _colors[1], corrected_transform);
 
 		v0 = v1;
 		v0.y = _box.min.y;
 		v1 = v0;
 		v1.z = _box.max.z;
-		addLineSegment(v0, v1, _colors[1], corrected_transform);
+		AddLineSegment(v0, v1, _colors[1], corrected_transform);
 	}
 
 	return true;

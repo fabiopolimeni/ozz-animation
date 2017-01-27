@@ -47,6 +47,12 @@ ozz::sample::internal::ImGuiVulkan::~ImGuiVulkan()
 
 }
 
+
+//////////////////////////////////////////////////////////////////////////
+// ImGui interface implementation.
+// See imgui.h for virtual function specifications.
+//////////////////////////////////////////////////////////////////////////
+
 void ozz::sample::internal::ImGuiVulkan::BeginFrame(const Inputs & _inputs, const math::RectInt & _rect, Renderer * _renderer)
 {
 }
@@ -95,4 +101,38 @@ void ozz::sample::internal::ImGuiVulkan::DoLabel(const char * _label, Justificat
 void ozz::sample::internal::ImGuiVulkan::DoGraph(const char * _label, float _min, float _max, float _mean,
 	const float * _value_cursor, const float * _value_begin, const float * _value_end)
 {
+}
+
+
+//////////////////////////////////////////////////////////////////////////
+// vk::RenderState interface implementation.
+// See renderstate_vulkan.h for virtual function specifications.
+//////////////////////////////////////////////////////////////////////////
+
+bool ozz::sample::internal::ImGuiVulkan::onInitResources(internal::ContextVulkan * context)
+{
+	return false;
+}
+
+void ozz::sample::internal::ImGuiVulkan::onReleaseResources()
+{
+}
+
+bool ozz::sample::internal::ImGuiVulkan::onRegisterRenderPass(size_t commandIndex)
+{
+	return false;
+}
+
+void ozz::sample::internal::ImGuiVulkan::onRenderPassesComplete()
+{
+}
+
+bool ozz::sample::internal::ImGuiVulkan::onSwapChainChange()
+{
+	return false;
+}
+
+bool ozz::sample::internal::ImGuiVulkan::isDirty()
+{
+	return false;
 }

@@ -39,6 +39,10 @@
 #include "ozz/base/containers/vector.h"
 #include "ozz/base/maths/rect.h"
 
+#include "framework/renderer.h"
+#include "framework/internal/renderstate_vulkan.h"
+#include "framework/internal/tools_vulkan.h"
+#include "framework/internal/context_vulkan.h"
 
 namespace ozz {
 	namespace sample {
@@ -47,7 +51,7 @@ namespace ozz {
 		namespace internal {
 
 			// Immediate mode gui implementation.
-			class ImGuiVulkan : public ImGui {
+			class ImGuiVulkan : public ImGui, public vk::RenderState {
 			public:
 				ImGuiVulkan();
 				virtual ~ImGuiVulkan();
@@ -62,8 +66,12 @@ namespace ozz {
 				virtual void EndFrame() override;
 
 			protected:
+
+
+				//////////////////////////////////////////////////////////////////////////
 				// Starts ImGui interface implementation.
 				// See imgui.h for virtual function specifications.
+				//////////////////////////////////////////////////////////////////////////
 
 				virtual void BeginContainer(const char* _title, const math::RectFloat* _rect,
 					bool* _open, bool _constrain) override;
@@ -89,6 +97,34 @@ namespace ozz {
 				virtual void DoGraph(const char* _label, float _min, float _max, float _mean,
 					const float* _value_cursor, const float* _value_begin,
 					const float* _value_end) override;
+
+
+				//////////////////////////////////////////////////////////////////////////
+				// Starts vk::RenderState interface implementation.
+				// See renderstate_vulkan.h for virtual function specifications.
+				//////////////////////////////////////////////////////////////////////////
+
+				// Gives a chance to create the render resources
+				virtual bool onInitResources(internal::ContextVulkan* context) override;
+
+				// Gives a chance to release all the owned resources
+				virtual void onReleaseResources() override;
+
+				// This function is called when command buffers are recorded,
+				// between vkCmdBeginRenderPass() and vkCmdEndRenderPass()
+				virtual bool onRegisterRenderPass(size_t commandIndex) override;
+
+				// Because we can have multiple render passes,
+				// this callback specify when the render context
+				// has finished to register them all.
+				virtual void onRenderPassesComplete() override;
+
+				// Notified when the swap chain has changed, e.g. resized.
+				virtual bool onSwapChainChange() override;
+
+				// Made dirty whenever we have to recreate any of the buffers,
+				// as these have to be re-bound to the render pass
+				virtual bool isDirty() override;
 			};
 
 		}  // internal
