@@ -50,6 +50,7 @@
 
 #ifdef OZZ_FRAMEWORK_VULKAN_RENDERER
 #include "framework/internal/renderer_vulkan.h"
+#include "framework/internal/imgui_vulkan.h"
 #else
 #include "framework/internal/imgui_opengl.h"
 #include "framework/internal/renderer_opengl.h"
@@ -116,7 +117,6 @@ void glfw_resize_callback(GLFWwindow* /*_window*/, int _width, int _height) {
 	auto* application_ = ozz::sample::Application::GetInstance();
 	application_->SetResolution({ _width, _height });
 }
-
 
 void glfw_fb_resize_callback(GLFWwindow* /*_window*/, int _width, int _height) {
 	// Stores new resolution settings.
@@ -272,6 +272,13 @@ int Application::Run(int _argc, const char** _argv, const char* _version,
 #ifdef OZZ_FRAMEWORK_VULKAN_RENDERER
 	renderer_ = memory::default_allocator()->New<internal::RendererVulkan>(camera_);
 	success = renderer_->Initialize();
+
+	if (success) {
+		im_gui_ = memory::default_allocator()->New<internal::ImGuiVulkan>();
+	}
+	else {
+		log::Err() << "Couldn't initialize Vulkan GUI system" << std::endl;
+	}
 #else
 	// Loading OpenGL extensions
 	glfwMakeContextCurrent(g_glfwWindow);

@@ -9,6 +9,8 @@ if(NOT EMSCRIPTEN)
     if (VULKAN_FOUND)
 
       include_directories(${VULKAN_INCLUDE_DIR})
+      include_directories(${CMAKE_SOURCE_DIR}/extern/imgui)
+
       add_definitions(-DOZZ_FRAMEWORK_VULKAN_RENDERER)
 
       set(ozz_renderer_source 
@@ -29,11 +31,15 @@ if(NOT EMSCRIPTEN)
         internal/skeleton_vulkan.h
         internal/skeleton_vulkan.cc
         internal/imgui_vulkan.h
-        internal/imgui_vulkan.cc)
+        internal/imgui_vulkan.cc
+        internal/imgui/imgui_impl_glfw_vulkan.h
+        internal/imgui/imgui_impl_glfw_vulkan.cpp)
 
       set(ozz_libs_to_link
-        glfw)
+        glfw
+        imgui)
 
+      add_subdirectory(${CMAKE_SOURCE_DIR}/extern/imgui imgui)
     else()
       set(ozz_build_with_vulkan OFF)
     endif()

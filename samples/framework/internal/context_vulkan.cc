@@ -375,7 +375,9 @@ bool ozz::sample::internal::ContextVulkan::createDepthResources()
 {
 	VkFormat depthFormat = vk::findDepthFormat(physicalDevice);
 
-	vk::createImage(physicalDevice, device, swapChainExtent.width, swapChainExtent.height, depthFormat, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, depthImage, depthImageMemory);
+	vk::createImage(physicalDevice, device, swapChainExtent.width, swapChainExtent.height, depthFormat,
+		VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, depthImage, depthImageMemory);
+
 	vk::createImageView(device, depthImage, depthFormat, VK_IMAGE_ASPECT_DEPTH_BIT, depthImageView);
 
 	VkCommandBuffer commandBuffer = vk::beginSingleTimeCommand(device, commandPool);
@@ -459,6 +461,13 @@ bool ozz::sample::internal::ContextVulkan::createCommandBuffers()
 
 			CHECK_VK_RESULT(vkEndCommandBuffer(commandBuffers[i]));
 		}
+	}
+
+	// Iterate through all the render states and
+	// and advice them we have finished registering
+	// all the render passes.
+	for (auto* rs : renderStates) {
+		rs->onRenderPassesComplete();
 	}
 
 	return true;
